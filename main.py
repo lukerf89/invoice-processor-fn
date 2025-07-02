@@ -52,9 +52,14 @@ def process_invoice(request):
     document = result.document
     entities = {e.type_: e.mention_text for e in document.entities}
     
+    # Debug: Log all detected entities
+    print(f"Document AI detected entities: {entities}")
+    
     vendor = entities.get("supplier_name", "").replace('\n', ' ').strip()
     invoice_number = entities.get("invoice_id", "")
     invoice_date = format_date(entities.get("invoice_date", ""))
+    
+    print(f"Extracted - Vendor: '{vendor}', Invoice#: '{invoice_number}', Date: '{invoice_date}'")
     
     # Step 6: Extract line items from tables
     rows = extract_line_items(document, invoice_date, vendor, invoice_number)
