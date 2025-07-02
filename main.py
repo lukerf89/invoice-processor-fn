@@ -74,7 +74,7 @@ def process_invoice(request):
         
         result = sheet.values().append(
             spreadsheetId=spreadsheet_id,
-            range=f"{sheet_name}!B:B",
+            range=f"{sheet_name}!B:G",
             valueInputOption="USER_ENTERED",
             insertDataOption="INSERT_ROWS",
             body={"values": rows}
@@ -102,10 +102,19 @@ def format_date(raw_date):
         return raw_date
 
 def clean_price(value):
-    """Extract numeric price from string"""
+    """Extract numeric price from string and format as currency"""
     if not value:
         return ""
-    return re.sub(r'[^0-9.-]', '', str(value))
+    # Extract numeric value
+    numeric_price = re.sub(r'[^0-9.-]', '', str(value))
+    if numeric_price:
+        try:
+            # Convert to float and format as currency
+            price_float = float(numeric_price)
+            return f"${price_float:.2f}"
+        except ValueError:
+            return ""
+    return ""
 
 def extract_line_items(document, invoice_date, vendor, invoice_number):
     """Extract line items from document tables"""
@@ -188,16 +197,28 @@ def extract_line_items_from_text(text, invoice_date, vendor, invoice_number):
             # Found a product code, try to extract item data
             product_code = line
             
-            # Look ahead for description and price data in a larger window
+            # Look ahead for description, quantity, and price data in a larger window
             description = ""
             price = ""
+            quantity = ""
             
-            # Check next several lines for description and price info
+            # Check next several lines for description, quantity and price info
             for j in range(i + 1, min(i + 8, len(lines))):
                 next_line = lines[j].strip()
                 
-                # Skip empty lines and lines that are just numbers/quantities
-                if not next_line or re.match(r'^\d+$', next_line) or next_line in ['0', '6', '24', 'each', 'Set']:
+                # Skip empty lines
+                if not next_line:
+                    continue
+                    
+                # Look for quantity (small numbers that aren't UPCs or prices)
+                if (re.match(r'^\d{1,3}$', next_line) and 
+                    int(next_line) <= 100 and 
+                    int(next_line) > 0 and 
+                    not quantity):
+                    quantity = next_line
+                
+                # Skip lines that are just numbers/identifiers we don't want
+                if next_line in ['0', 'each', 'Set'] or re.match(r'^\d{12,}$', next_line):
                     continue
                     
                 # Look for description (longer text with product details)
@@ -213,7 +234,7 @@ def extract_line_items_from_text(text, invoice_date, vendor, invoice_number):
                     found_price = price_match.group(1)
                     # Prefer prices that are reasonable (not 0.00, not quantities like 191009...)
                     if float(found_price) > 0 and float(found_price) < 1000 and not price:
-                        price = found_price
+                        price = clean_price(found_price)
             
             # Add row even if we only have product code (better to have incomplete data)
             if product_code:
@@ -222,6 +243,7 @@ def extract_line_items_from_text(text, invoice_date, vendor, invoice_number):
                     vendor,
                     invoice_number,
                     f"{product_code} - {description}".strip(' -') if description else product_code,
+                    quantity if quantity else "",
                     price if price else ""
                 ])
     
