@@ -52,7 +52,7 @@ def process_invoice(request):
     document = result.document
     entities = {e.type_: e.mention_text for e in document.entities}
     
-    vendor = entities.get("supplier_name", "")
+    vendor = entities.get("supplier_name", "").replace('\n', ' ').strip()
     invoice_number = entities.get("invoice_id", "")
     invoice_date = format_date(entities.get("invoice_date", ""))
     
@@ -74,8 +74,9 @@ def process_invoice(request):
         
         result = sheet.values().append(
             spreadsheetId=spreadsheet_id,
-            range=f"{sheet_name}!A1",
+            range=f"{sheet_name}!A:A",
             valueInputOption="USER_ENTERED",
+            insertDataOption="INSERT_ROWS",
             body={"values": rows}
         ).execute()
         
@@ -200,7 +201,7 @@ def extract_line_items_from_text(text, invoice_date, vendor, invoice_number):
                     continue
                     
                 # Look for description (contains letters and common description words)
-                if any(word in next_line.lower() for word in ['wood', 'metal', 'cotton', 'resin', 'stoneware', 'frame', 'dish', 'tray']) and not description:
+                if any(word in next_line.lower() for word in ['wood', 'metal', 'cotton', 'resin', 'stoneware', 'frame', 'dish', 'tray', 'scalloped', 'towel', 'bookends', 'magnet']) and not description:
                     description = next_line
                 
                 # Look for price (decimal number)
