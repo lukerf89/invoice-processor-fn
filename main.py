@@ -74,7 +74,7 @@ def process_invoice(request):
         
         result = sheet.values().append(
             spreadsheetId=spreadsheet_id,
-            range=f"{sheet_name}!B:G",
+            range=f"{sheet_name}!A:G",
             valueInputOption="USER_ENTERED",
             insertDataOption="INSERT_ROWS",
             body={"values": rows}
@@ -174,6 +174,7 @@ def extract_line_items(document, invoice_date, vendor, invoice_number):
                 # Only add row if we have meaningful data
                 if item_description or wholesale_price:
                     rows.append([
+                        "",  # Empty placeholder for column A
                         invoice_date,
                         vendor,
                         invoice_number,
@@ -239,12 +240,13 @@ def extract_line_items_from_text(text, invoice_date, vendor, invoice_number):
             # Add row even if we only have product code (better to have incomplete data)
             if product_code:
                 rows.append([
+                    "",  # Empty placeholder for column A
                     invoice_date,
                     vendor,
                     invoice_number,
                     f"{product_code} - {description}".strip(' -') if description else product_code,
-                    quantity if quantity else "",
-                    price if price else ""
+                    price if price else "",  # Column F: Wholesale Price
+                    quantity if quantity else ""  # Column G: Quantity
                 ])
     
     return rows
