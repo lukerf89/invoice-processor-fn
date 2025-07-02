@@ -74,7 +74,7 @@ def process_invoice(request):
         
         result = sheet.values().append(
             spreadsheetId=spreadsheet_id,
-            range=f"{sheet_name}!A:A",
+            range=f"{sheet_name}!B:B",
             valueInputOption="USER_ENTERED",
             insertDataOption="INSERT_ROWS",
             body={"values": rows}
@@ -188,35 +188,41 @@ def extract_line_items_from_text(text, invoice_date, vendor, invoice_number):
             # Found a product code, try to extract item data
             product_code = line
             
-            # Look ahead for description, price data
+            # Look ahead for description and price data in a larger window
             description = ""
             price = ""
             
-            # Check next few lines for description and price info
-            for j in range(i + 1, min(i + 5, len(lines))):
+            # Check next several lines for description and price info
+            for j in range(i + 1, min(i + 8, len(lines))):
                 next_line = lines[j].strip()
                 
-                # Skip empty lines and numeric-only lines (quantities, etc.)
-                if not next_line or next_line.replace('.', '').replace('-', '').isdigit():
+                # Skip empty lines and lines that are just numbers/quantities
+                if not next_line or re.match(r'^\d+$', next_line) or next_line in ['0', '6', '24', 'each', 'Set']:
                     continue
                     
-                # Look for description (contains letters and common description words)
-                if any(word in next_line.lower() for word in ['wood', 'metal', 'cotton', 'resin', 'stoneware', 'frame', 'dish', 'tray', 'scalloped', 'towel', 'bookends', 'magnet']) and not description:
+                # Look for description (longer text with product details)
+                if (len(next_line) > 10 and 
+                    any(char.isalpha() for char in next_line) and 
+                    not re.match(r'^\d+\.\d{2}$', next_line) and
+                    not description):
                     description = next_line
                 
-                # Look for price (decimal number)
-                price_match = re.search(r'\b\d+\.\d{2}\b', next_line)
-                if price_match and not price:
-                    price = price_match.group()
+                # Look for price (decimal number, prefer prices that look reasonable)
+                price_match = re.search(r'\b(\d+\.\d{2})\b', next_line)
+                if price_match:
+                    found_price = price_match.group(1)
+                    # Prefer prices that are reasonable (not 0.00, not quantities like 191009...)
+                    if float(found_price) > 0 and float(found_price) < 1000 and not price:
+                        price = found_price
             
-            # Add row if we found meaningful data
-            if description or price:
+            # Add row even if we only have product code (better to have incomplete data)
+            if product_code:
                 rows.append([
                     invoice_date,
                     vendor,
                     invoice_number,
-                    f"{product_code} - {description}".strip(' -'),
-                    price
+                    f"{product_code} - {description}".strip(' -') if description else product_code,
+                    price if price else ""
                 ])
     
     return rows
