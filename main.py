@@ -59,6 +59,10 @@ def process_invoice(request):
     # Step 6: Extract line items from tables
     rows = extract_line_items(document, invoice_date, vendor, invoice_number)
     
+    # Step 6b: If no table data found, try text-based parsing
+    if not rows:
+        rows = extract_line_items_from_text(document.text, invoice_date, vendor, invoice_number)
+    
     if not rows:
         return jsonify({"warning": "No line items found in invoice", "text": document.text}), 200
     
@@ -106,8 +110,13 @@ def extract_line_items(document, invoice_date, vendor, invoice_number):
     """Extract line items from document tables"""
     rows = []
     
+    # Debug: print table count
+    table_count = sum(len(page.tables) for page in document.pages)
+    print(f"Found {table_count} tables in document")
+    
     for page in document.pages:
-        for table in page.tables:
+        for table_idx, table in enumerate(page.tables):
+            print(f"Processing table {table_idx + 1}")
             if not table.header_rows:
                 continue
                 
@@ -119,8 +128,13 @@ def extract_line_items(document, invoice_date, vendor, invoice_number):
                 else:
                     headers.append("")
             
-            # Skip if no relevant headers found
-            if not any("description" in h or "item" in h for h in headers) or not any("price" in h for h in headers):
+            # Check for relevant columns with broader matching
+            has_item_column = any(keyword in h for h in headers for keyword in 
+                                ["description", "item", "product", "sku", "code"])
+            has_price_column = any(keyword in h for h in headers for keyword in 
+                                 ["price", "amount", "cost", "total", "extended"])
+            
+            if not has_item_column or not has_price_column:
                 continue
             
             # Process each row
@@ -138,10 +152,14 @@ def extract_line_items(document, invoice_date, vendor, invoice_number):
                 
                 for idx, header in enumerate(headers):
                     if idx < len(cells):
-                        if "description" in header or "item" in header:
-                            item_description = cells[idx]
-                        elif "price" in header or "amount" in header:
-                            wholesale_price = clean_price(cells[idx])
+                        # Match item/product columns
+                        if any(keyword in header for keyword in ["description", "item", "product", "sku", "code"]):
+                            if not item_description or len(cells[idx]) > len(item_description):
+                                item_description = cells[idx]
+                        # Match price columns (prefer "your price" over "list price")
+                        elif any(keyword in header for keyword in ["your price", "unit price", "price", "extended", "amount", "cost"]):
+                            if not wholesale_price or "your" in header or "unit" in header:
+                                wholesale_price = clean_price(cells[idx])
                 
                 # Only add row if we have meaningful data
                 if item_description or wholesale_price:
@@ -152,5 +170,52 @@ def extract_line_items(document, invoice_date, vendor, invoice_number):
                         item_description,
                         wholesale_price
                     ])
+    
+    return rows
+
+def extract_line_items_from_text(text, invoice_date, vendor, invoice_number):
+    """Extract line items from raw text when no tables are detected"""
+    rows = []
+    lines = text.split('\n')
+    
+    # Look for product codes (pattern: 2+ letters followed by digits)
+    product_pattern = r'^[A-Z]{2,}\d+'
+    
+    for i, line in enumerate(lines):
+        line = line.strip()
+        if re.match(product_pattern, line):
+            # Found a product code, try to extract item data
+            product_code = line
+            
+            # Look ahead for description, price data
+            description = ""
+            price = ""
+            
+            # Check next few lines for description and price info
+            for j in range(i + 1, min(i + 5, len(lines))):
+                next_line = lines[j].strip()
+                
+                # Skip empty lines and numeric-only lines (quantities, etc.)
+                if not next_line or next_line.replace('.', '').replace('-', '').isdigit():
+                    continue
+                    
+                # Look for description (contains letters and common description words)
+                if any(word in next_line.lower() for word in ['wood', 'metal', 'cotton', 'resin', 'stoneware', 'frame', 'dish', 'tray']) and not description:
+                    description = next_line
+                
+                # Look for price (decimal number)
+                price_match = re.search(r'\b\d+\.\d{2}\b', next_line)
+                if price_match and not price:
+                    price = price_match.group()
+            
+            # Add row if we found meaningful data
+            if description or price:
+                rows.append([
+                    invoice_date,
+                    vendor,
+                    invoice_number,
+                    f"{product_code} - {description}".strip(' -'),
+                    price
+                ])
     
     return rows
