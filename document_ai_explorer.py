@@ -8,7 +8,7 @@ all available extracted information in a structured format.
 
 import os
 import json
-from google.cloud import documentai
+from google.cloud import documentai_v1 as documentai
 from typing import Optional
 
 
