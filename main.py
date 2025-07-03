@@ -55,16 +55,21 @@ def process_invoice(request):
     # Debug: Log all detected entities
     print(f"Document AI detected entities: {entities}")
     
-    vendor = entities.get("supplier_name", "").replace('\n', ' ').strip()
+    # Extract vendor using confidence-based selection
+    vendor = extract_best_vendor(document.entities)
     invoice_number = entities.get("invoice_id", "")
     invoice_date = format_date(entities.get("invoice_date", ""))
     
     print(f"Extracted - Vendor: '{vendor}', Invoice#: '{invoice_number}', Date: '{invoice_date}'")
     
-    # Step 6: Extract line items from tables
-    rows = extract_line_items(document, invoice_date, vendor, invoice_number)
+    # Step 6: Extract line items from Document AI entities first
+    rows = extract_line_items_from_entities(document, invoice_date, vendor, invoice_number)
     
-    # Step 6b: If no table data found, try text-based parsing
+    # Step 6b: If no entity data found, try table parsing
+    if not rows:
+        rows = extract_line_items(document, invoice_date, vendor, invoice_number)
+    
+    # Step 6c: Final fallback to text-based parsing
     if not rows:
         rows = extract_line_items_from_text(document.text, invoice_date, vendor, invoice_number)
     
@@ -120,6 +125,128 @@ def clean_price(value):
         except ValueError:
             return ""
     return ""
+
+def extract_best_vendor(entities):
+    """Extract vendor name using confidence scores and priority order"""
+    # Priority order of vendor-related entity types
+    vendor_fields = [
+        "remit_to_name",
+        "supplier_name", 
+        "vendor_name",
+        "bill_from_name"
+    ]
+    
+    vendor_candidates = []
+    
+    # Collect all vendor-related entities with their confidence scores
+    for entity in entities:
+        if entity.type_ in vendor_fields and entity.mention_text.strip():
+            vendor_candidates.append({
+                'type': entity.type_,
+                'text': entity.mention_text.replace('\n', ' ').strip(),
+                'confidence': entity.confidence
+            })
+    
+    print(f"Vendor candidates: {vendor_candidates}")
+    
+    if not vendor_candidates:
+        return ""
+    
+    # If we have multiple candidates, prefer by confidence first, then by priority
+    if len(vendor_candidates) > 1:
+        # Sort by confidence (descending), then by priority order
+        vendor_candidates.sort(key=lambda x: (
+            -x['confidence'],  # Higher confidence first
+            vendor_fields.index(x['type']) if x['type'] in vendor_fields else 999  # Lower index = higher priority
+        ))
+        
+        print(f"Selected vendor: {vendor_candidates[0]['text']} (type: {vendor_candidates[0]['type']}, confidence: {vendor_candidates[0]['confidence']:.3f})")
+    
+    return vendor_candidates[0]['text']
+
+def extract_line_items_from_entities(document, invoice_date, vendor, invoice_number):
+    """Extract line items from Document AI entities"""
+    rows = []
+    
+    # Debug: Log all entity types and their properties
+    print("=== Document AI Entity Analysis ===")
+    line_item_count = 0
+    
+    for i, entity in enumerate(document.entities):
+        print(f"Entity {i}: {entity.type_} = '{entity.mention_text}' (confidence: {entity.confidence:.3f})")
+        
+        if entity.type_ == "line_item":
+            line_item_count += 1
+            # Extract line item properties
+            item_description = ""
+            product_code = ""
+            unit_price = ""
+            quantity = ""
+            line_total = ""
+            
+            # Process properties of the line item
+            if hasattr(entity, 'properties') and entity.properties:
+                print(f"  Line item {line_item_count} properties:")
+                for prop in entity.properties:
+                    print(f"    {prop.type_} = '{prop.mention_text}' (confidence: {prop.confidence:.3f})")
+                    
+                    if prop.type_ == "line_item/description":
+                        item_description = prop.mention_text.strip()
+                    elif prop.type_ == "line_item/product_code":
+                        product_code = prop.mention_text.strip()
+                    elif prop.type_ == "line_item/unit_price":
+                        unit_price = clean_price(prop.mention_text)
+                    elif prop.type_ == "line_item/quantity":
+                        # Clean quantity - remove extra spaces and non-numeric parts
+                        qty_text = prop.mention_text.strip()
+                        # Extract just the number from strings like "24\n24" or "0 6"
+                        qty_match = re.search(r'\b(\d+)\b', qty_text.replace('\n', ' '))
+                        if qty_match:
+                            quantity = qty_match.group(1)
+                    elif prop.type_ == "line_item/amount":
+                        line_total = clean_price(prop.mention_text)
+            
+            # If no description but we have the main entity text, use that
+            if not item_description and entity.mention_text:
+                item_description = entity.mention_text.strip()
+            
+            # Create a complete description with product code if available
+            full_description = ""
+            if product_code and item_description:
+                full_description = f"{product_code} - {item_description}"
+            elif item_description:
+                full_description = item_description
+            elif product_code:
+                full_description = product_code
+            
+            # Only add row if we have a meaningful description AND either price or quantity
+            # This filters out incomplete/malformed line items
+            if (full_description and len(full_description) > 5 and 
+                (unit_price or quantity)):
+                
+                # Skip rows with zero amounts unless they have valid quantity
+                skip_row = False
+                if line_total == "$0.00" and not quantity:
+                    skip_row = True
+                
+                if not skip_row:
+                    rows.append([
+                        "",  # Column A placeholder
+                        invoice_date,
+                        vendor, 
+                        invoice_number,
+                        full_description,
+                        unit_price if unit_price else "",
+                        quantity if quantity else ""
+                    ])
+                    print(f"  -> Added row: {full_description}, {unit_price}, Qty: {quantity}")
+                else:
+                    print(f"  -> Skipped row (zero amount, no qty): {full_description}")
+            else:
+                print(f"  -> Skipped row (insufficient data): desc='{full_description}', price='{unit_price}', qty='{quantity}'")
+    
+    print(f"Found {line_item_count} line_item entities, created {len(rows)} rows")
+    return rows
 
 def extract_line_items(document, invoice_date, vendor, invoice_number):
     """Extract line items from document tables"""
