@@ -193,16 +193,37 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                     if prop.type_ == "line_item/description":
                         item_description = prop.mention_text.strip()
                     elif prop.type_ == "line_item/product_code":
-                        product_code = prop.mention_text.strip()
+                        # Include both short and long codes
+                        candidate_code = prop.mention_text.strip()
+                        if product_code:
+                            product_code += f" - {candidate_code}"
+                        else:
+                            product_code = candidate_code
                     elif prop.type_ == "line_item/unit_price":
-                        unit_price = clean_price(prop.mention_text)
+                        # Always use the lower price (Your Price, not List Price)
+                        candidate_price = clean_price(prop.mention_text)
+                        if not unit_price:
+                            unit_price = candidate_price
+                        else:
+                            # Compare prices and use the lower one
+                            try:
+                                current_val = float(unit_price.replace('$', ''))
+                                candidate_val = float(candidate_price.replace('$', ''))
+                                if candidate_val < current_val and candidate_val > 0:
+                                    unit_price = candidate_price
+                            except:
+                                pass
                     elif prop.type_ == "line_item/quantity":
-                        # Clean quantity - remove extra spaces and non-numeric parts
+                        # Use shipped quantity (non-zero value)
                         qty_text = prop.mention_text.strip()
-                        # Extract just the number from strings like "24\n24" or "0 6"
-                        qty_match = re.search(r'\b(\d+)\b', qty_text.replace('\n', ' '))
-                        if qty_match:
-                            quantity = qty_match.group(1)
+                        # Extract all numbers from patterns like "6 0" or "24\n24"
+                        qty_numbers = re.findall(r'\b(\d+)\b', qty_text.replace('\n', ' '))
+                        if qty_numbers:
+                            # Use the first non-zero quantity (shipped quantity)
+                            for num in qty_numbers:
+                                if int(num) > 0:
+                                    quantity = num
+                                    break
                     elif prop.type_ == "line_item/amount":
                         line_total = clean_price(prop.mention_text)
             
