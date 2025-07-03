@@ -126,6 +126,84 @@ def clean_price(value):
             return ""
     return ""
 
+def extract_short_product_code(full_text, description_text=""):
+    """Extract short product code (like DF8011, DG0110A) from text"""
+    # Combine both texts to search in
+    search_text = f"{description_text} {full_text}"
+    
+    # Pattern for short product codes: 2-4 letters followed by 2-8 digits, possibly with letters at end
+    # Examples: DF8011, DG0110A, AB1234, XYZ123456
+    short_code_pattern = r'\b([A-Z]{2,4}\d{2,8}[A-Z]?)\b'
+    
+    matches = re.findall(short_code_pattern, search_text)
+    
+    if matches:
+        # Filter out UPCs (too long) and prefer shorter codes
+        valid_codes = []
+        for match in matches:
+            # Skip if it's likely a UPC (long numeric after letters)
+            if len(match) <= 10:  # Reasonable product code length
+                valid_codes.append(match)
+        
+        if valid_codes:
+            # Return the first valid match (usually the product code appears first)
+            return valid_codes[0]
+    
+    return None
+
+def extract_wholesale_price(full_text):
+    """Extract wholesale price (typically the second price in a sequence)"""
+    # Find all price patterns in the text
+    price_pattern = r'\b(\d+\.\d{2})\b'
+    prices = re.findall(price_pattern, full_text)
+    
+    if len(prices) >= 2:
+        # When we have multiple prices like "8.50 6.80 40.80"
+        # The second price is typically the wholesale price
+        wholesale_price = prices[1]
+        
+        # Validate it's a reasonable price (not a total amount)
+        try:
+            price_val = float(wholesale_price)
+            if 0.01 <= price_val <= 500.00:  # Reasonable price range
+                return f"${price_val:.2f}"
+        except ValueError:
+            pass
+    
+    elif len(prices) == 1:
+        # Only one price found, use it
+        try:
+            price_val = float(prices[0])
+            if 0.01 <= price_val <= 500.00:
+                return f"${price_val:.2f}"
+        except ValueError:
+            pass
+    
+    return None
+
+def extract_shipped_quantity(full_text):
+    """Extract shipped quantity (typically the first quantity in a sequence)"""
+    # Find all numbers that could be quantities
+    # Look for patterns like "6 0" or "24\n24" in the text
+    
+    # Split by spaces and newlines to get individual tokens
+    tokens = re.split(r'[\s\n]+', full_text)
+    
+    quantities = []
+    for token in tokens:
+        # Look for pure numbers that could be quantities
+        if re.match(r'^\d+$', token):
+            num = int(token)
+            # Filter out UPCs (too long) and unreasonable quantities
+            if 1 <= num <= 999 and len(token) <= 3:
+                quantities.append(str(num))
+    
+    if quantities:
+        # Return the first valid quantity (shipped quantity)
+        return quantities[0]
+    
+    return None
+
 def extract_best_vendor(entities):
     """Extract vendor name using confidence scores and priority order"""
     # Priority order of vendor-related entity types
@@ -184,6 +262,9 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
             quantity = ""
             line_total = ""
             
+            # Store the full line item text for advanced parsing
+            full_line_text = entity.mention_text.strip()
+            
             # Process properties of the line item
             if hasattr(entity, 'properties') and entity.properties:
                 print(f"  Line item {line_item_count} properties:")
@@ -193,39 +274,39 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                     if prop.type_ == "line_item/description":
                         item_description = prop.mention_text.strip()
                     elif prop.type_ == "line_item/product_code":
-                        # Include both short and long codes
+                        # Store the UPC/long code as fallback
                         candidate_code = prop.mention_text.strip()
-                        if product_code:
-                            product_code += f" - {candidate_code}"
-                        else:
+                        if not product_code:
                             product_code = candidate_code
                     elif prop.type_ == "line_item/unit_price":
-                        # Always use the lower price (Your Price, not List Price)
-                        candidate_price = clean_price(prop.mention_text)
-                        if not unit_price:
-                            unit_price = candidate_price
-                        else:
-                            # Compare prices and use the lower one
-                            try:
-                                current_val = float(unit_price.replace('$', ''))
-                                candidate_val = float(candidate_price.replace('$', ''))
-                                if candidate_val < current_val and candidate_val > 0:
-                                    unit_price = candidate_price
-                            except:
-                                pass
+                        # Store the price (we'll parse multiple prices from full text later)
+                        unit_price = clean_price(prop.mention_text)
                     elif prop.type_ == "line_item/quantity":
-                        # Use shipped quantity (non-zero value)
-                        qty_text = prop.mention_text.strip()
-                        # Extract all numbers from patterns like "6 0" or "24\n24"
-                        qty_numbers = re.findall(r'\b(\d+)\b', qty_text.replace('\n', ' '))
-                        if qty_numbers:
-                            # Use the first non-zero quantity (shipped quantity)
-                            for num in qty_numbers:
-                                if int(num) > 0:
-                                    quantity = num
-                                    break
+                        # Store the quantity (we'll parse multiple quantities from full text later)
+                        quantity = prop.mention_text.strip()
                     elif prop.type_ == "line_item/amount":
                         line_total = clean_price(prop.mention_text)
+            
+            # Advanced parsing of the full line item text
+            print(f"  Full line text: '{full_line_text}'")
+            
+            # 1. Extract the correct product code (short alphanumeric code)
+            short_product_code = extract_short_product_code(full_line_text, item_description)
+            if short_product_code:
+                product_code = short_product_code
+                print(f"  -> Found short product code: '{product_code}'")
+            
+            # 2. Extract wholesale price (second price in sequence)
+            wholesale_price = extract_wholesale_price(full_line_text)
+            if wholesale_price:
+                unit_price = wholesale_price
+                print(f"  -> Found wholesale price: '{unit_price}'")
+            
+            # 3. Extract shipped quantity (first quantity in sequence)
+            shipped_quantity = extract_shipped_quantity(full_line_text)
+            if shipped_quantity:
+                quantity = shipped_quantity
+                print(f"  -> Found shipped quantity: '{quantity}'")
             
             # If no description but we have the main entity text, use that
             if not item_description and entity.mention_text:
@@ -234,7 +315,11 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
             # Create a complete description with product code if available
             full_description = ""
             if product_code and item_description:
-                full_description = f"{product_code} - {item_description}"
+                # If product code is just a UPC (long number), put it at the end
+                if product_code.isdigit() and len(product_code) > 8:
+                    full_description = f"{item_description} (UPC: {product_code})"
+                else:
+                    full_description = f"{product_code} - {item_description}"
             elif item_description:
                 full_description = item_description
             elif product_code:
@@ -353,42 +438,34 @@ def extract_line_items_from_text(text, invoice_date, vendor, invoice_number):
             
             # Look ahead for description, quantity, and price data in a larger window
             description = ""
-            price = ""
-            quantity = ""
+            full_line_context = line
             
-            # Check next several lines for description, quantity and price info
+            # Gather context from surrounding lines
             for j in range(i + 1, min(i + 8, len(lines))):
                 next_line = lines[j].strip()
-                
-                # Skip empty lines
                 if not next_line:
                     continue
-                    
-                # Look for quantity (small numbers that aren't UPCs or prices)
-                if (re.match(r'^\d{1,3}$', next_line) and 
-                    int(next_line) <= 100 and 
-                    int(next_line) > 0 and 
-                    not quantity):
-                    quantity = next_line
                 
-                # Skip lines that are just numbers/identifiers we don't want
-                if next_line in ['0', 'each', 'Set'] or re.match(r'^\d{12,}$', next_line):
-                    continue
-                    
+                # Add to context for advanced parsing
+                full_line_context += f" {next_line}"
+                
                 # Look for description (longer text with product details)
                 if (len(next_line) > 10 and 
                     any(char.isalpha() for char in next_line) and 
                     not re.match(r'^\d+\.\d{2}$', next_line) and
                     not description):
                     description = next_line
-                
-                # Look for price (decimal number, prefer prices that look reasonable)
-                price_match = re.search(r'\b(\d+\.\d{2})\b', next_line)
-                if price_match:
-                    found_price = price_match.group(1)
-                    # Prefer prices that are reasonable (not 0.00, not quantities like 191009...)
-                    if float(found_price) > 0 and float(found_price) < 1000 and not price:
-                        price = clean_price(found_price)
+            
+            # Use advanced parsing functions
+            short_product_code = extract_short_product_code(full_line_context, description)
+            if short_product_code:
+                product_code = short_product_code
+            
+            wholesale_price = extract_wholesale_price(full_line_context)
+            price = wholesale_price if wholesale_price else ""
+            
+            shipped_quantity = extract_shipped_quantity(full_line_context)
+            quantity = shipped_quantity if shipped_quantity else ""
             
             # Add row even if we only have product code (better to have incomplete data)
             if product_code:
