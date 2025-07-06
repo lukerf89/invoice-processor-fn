@@ -129,7 +129,7 @@ def clean_price(value):
 def extract_specific_invoice_number(document_text, line_item_text):
     """Extract specific invoice number for summary invoices with multiple invoice numbers"""
     # Look for patterns like "Invoice # 77389954" or "Invoice # 77390022" in the document
-    # and match them to line items based on proximity
+    # and match them to line items based on proximity and section boundaries
     
     # Find all invoice numbers in the document
     invoice_pattern = r'Invoice\s*#\s*(\d+)'
@@ -140,11 +140,18 @@ def extract_specific_invoice_number(document_text, line_item_text):
         return None
     
     # For summary invoices, try to determine which invoice this line item belongs to
-    # Look for invoice numbers near the line item in the document text
+    # Look for the product code (ISBN) in the line item to help identify sections
     
-    # Find the position of this line item text in the full document
-    line_item_pos = document_text.find(line_item_text)
-    if line_item_pos == -1:
+    # Extract ISBN from line item if present
+    isbn_match = re.search(r'\b(978\d{10})\b', line_item_text)
+    if not isbn_match:
+        return None
+    
+    isbn = isbn_match.group(1)
+    
+    # Find where this ISBN appears in the document and get the closest preceding invoice number
+    isbn_pos = document_text.find(isbn)
+    if isbn_pos == -1:
         return None
     
     # Look for the closest preceding invoice number
@@ -155,9 +162,9 @@ def extract_specific_invoice_number(document_text, line_item_text):
         invoice_num = match.group(1)
         invoice_pos = match.start()
         
-        # Only consider invoice numbers that appear before this line item
-        if invoice_pos < line_item_pos:
-            distance = line_item_pos - invoice_pos
+        # Only consider invoice numbers that appear before this ISBN in the document
+        if invoice_pos < isbn_pos:
+            distance = isbn_pos - invoice_pos
             if distance < best_distance:
                 best_distance = distance
                 best_invoice = invoice_num
@@ -418,11 +425,8 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
             # Create a complete description with product code if available
             full_description = ""
             if product_code and item_description:
-                # If product code is just a UPC (long number), put it at the end
-                if product_code.isdigit() and len(product_code) > 8:
-                    full_description = f"{item_description} (UPC: {product_code})"
-                else:
-                    full_description = f"{product_code} - {item_description}"
+                # Always put product code at the beginning, whether it's ISBN, UPC, or other codes
+                full_description = f"{product_code} - {item_description}"
             elif item_description:
                 full_description = item_description
             elif product_code:
