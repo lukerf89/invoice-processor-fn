@@ -127,14 +127,20 @@ def clean_price(value):
     return ""
 
 def extract_short_product_code(full_text, description_text=""):
-    """Extract short product code (like DF8011, DG0110A) from text"""
+    """Extract product code from various formats"""
     # Combine both texts to search in
     search_text = f"{description_text} {full_text}"
     
-    # Pattern for short product codes: 2-4 letters followed by 2-8 digits, possibly with letters at end
-    # Examples: DF8011, DG0110A, AB1234, XYZ123456
-    short_code_pattern = r'\b([A-Z]{2,4}\d{2,8}[A-Z]?)\b'
+    # Pattern 1: Numbers + letters (like "006 AR", "008 TIN", "012 AR")
+    # Look for this pattern at the start of the text
+    number_letter_pattern = r'\b(\d{3}\s+[A-Z]{2,4})\b'
+    matches = re.findall(number_letter_pattern, full_text)
+    if matches:
+        return matches[0]  # Return first match like "006 AR"
     
+    # Pattern 2: Traditional product codes (like DF8011, DG0110A) 
+    # 2-4 letters followed by 2-8 digits, possibly with letters at end
+    short_code_pattern = r'\b([A-Z]{2,4}\d{2,8}[A-Z]?)\b'
     matches = re.findall(short_code_pattern, search_text)
     
     if matches:
@@ -146,7 +152,7 @@ def extract_short_product_code(full_text, description_text=""):
                 valid_codes.append(match)
         
         if valid_codes:
-            # Return the first valid match (usually the product code appears first)
+            # Return the first valid match
             return valid_codes[0]
     
     return None
@@ -182,25 +188,42 @@ def extract_wholesale_price(full_text):
     return None
 
 def extract_shipped_quantity(full_text):
-    """Extract shipped quantity (typically the first quantity in a sequence)"""
-    # Find all numbers that could be quantities
-    # Look for patterns like "6 0" or "24\n24" in the text
+    """Extract shipped quantity from patterns like '8 00' or '24\n24'"""
+    # Remove product codes and descriptions first to focus on numbers
+    # Look for the pattern after product code but before prices
     
     # Split by spaces and newlines to get individual tokens
     tokens = re.split(r'[\s\n]+', full_text)
     
     quantities = []
-    for token in tokens:
+    found_product_code = False
+    
+    for i, token in enumerate(tokens):
+        # Skip the product code part (like "006", "AR")
+        if re.match(r'^\d{3}$', token) or re.match(r'^[A-Z]{2,4}$', token):
+            found_product_code = True
+            continue
+        
         # Look for pure numbers that could be quantities
         if re.match(r'^\d+$', token):
             num = int(token)
-            # Filter out UPCs (too long) and unreasonable quantities
+            # Filter reasonable quantities (1-999, not prices like 16.50 or amounts like 132.00)
             if 1 <= num <= 999 and len(token) <= 3:
+                # Skip if it looks like part of a price (next token might be decimal)
+                if i + 1 < len(tokens) and re.match(r'^\d{2}$', tokens[i + 1]):
+                    continue  # This is likely "16.50" split as "16" "50"
                 quantities.append(str(num))
     
     if quantities:
-        # Return the first valid quantity (shipped quantity)
+        # Return the first valid quantity after product code
         return quantities[0]
+    
+    # Fallback: look for any reasonable quantity
+    for token in tokens:
+        if re.match(r'^\d+$', token):
+            num = int(token)
+            if 1 <= num <= 999 and len(token) <= 3:
+                return str(num)
     
     return None
 
@@ -296,11 +319,15 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                 product_code = short_product_code
                 print(f"  -> Found short product code: '{product_code}'")
             
-            # 2. Extract wholesale price (second price in sequence)
-            wholesale_price = extract_wholesale_price(full_line_text)
-            if wholesale_price:
-                unit_price = wholesale_price
-                print(f"  -> Found wholesale price: '{unit_price}'")
+            # 2. Use Document AI unit_price if available, otherwise try to extract from text
+            if not unit_price:
+                # Try to extract wholesale price from text if Document AI didn't find it
+                wholesale_price = extract_wholesale_price(full_line_text)
+                if wholesale_price:
+                    unit_price = wholesale_price
+                    print(f"  -> Found wholesale price from text: '{unit_price}'")
+            else:
+                print(f"  -> Using Document AI unit_price: '{unit_price}'")
             
             # 3. Extract shipped quantity (first quantity in sequence)
             shipped_quantity = extract_shipped_quantity(full_line_text)
