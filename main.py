@@ -329,11 +329,28 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
             else:
                 print(f"  -> Using Document AI unit_price: '{unit_price}'")
             
-            # 3. Extract shipped quantity (first quantity in sequence)
-            shipped_quantity = extract_shipped_quantity(full_line_text)
-            if shipped_quantity:
-                quantity = shipped_quantity
-                print(f"  -> Found shipped quantity: '{quantity}'")
+            # 3. Extract shipped quantity - prioritize Document AI property first
+            if hasattr(entity, 'properties') and entity.properties:
+                for prop in entity.properties:
+                    if prop.type_ == "line_item/quantity":
+                        # Clean the quantity from Document AI property
+                        qty_text = prop.mention_text.strip()
+                        # Extract first non-zero number from patterns like "8 00"
+                        qty_numbers = re.findall(r'\b(\d+)\b', qty_text)
+                        if qty_numbers:
+                            for num in qty_numbers:
+                                if int(num) > 0:
+                                    quantity = num
+                                    print(f"  -> Found quantity from property: '{quantity}'")
+                                    break
+                        break
+            
+            # Fallback to text parsing if no quantity found
+            if not quantity:
+                shipped_quantity = extract_shipped_quantity(full_line_text)
+                if shipped_quantity:
+                    quantity = shipped_quantity
+                    print(f"  -> Found shipped quantity from text: '{quantity}'")
             
             # If no description but we have the main entity text, use that
             if not item_description and entity.mention_text:
