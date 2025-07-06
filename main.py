@@ -126,6 +126,44 @@ def clean_price(value):
             return ""
     return ""
 
+def extract_specific_invoice_number(document_text, line_item_text):
+    """Extract specific invoice number for summary invoices with multiple invoice numbers"""
+    # Look for patterns like "Invoice # 77389954" or "Invoice # 77390022" in the document
+    # and match them to line items based on proximity
+    
+    # Find all invoice numbers in the document
+    invoice_pattern = r'Invoice\s*#\s*(\d+)'
+    invoice_matches = re.findall(invoice_pattern, document_text, re.IGNORECASE)
+    
+    if len(invoice_matches) <= 1:
+        # Single invoice, no need to extract specific numbers
+        return None
+    
+    # For summary invoices, try to determine which invoice this line item belongs to
+    # Look for invoice numbers near the line item in the document text
+    
+    # Find the position of this line item text in the full document
+    line_item_pos = document_text.find(line_item_text)
+    if line_item_pos == -1:
+        return None
+    
+    # Look for the closest preceding invoice number
+    best_invoice = None
+    best_distance = float('inf')
+    
+    for match in re.finditer(invoice_pattern, document_text, re.IGNORECASE):
+        invoice_num = match.group(1)
+        invoice_pos = match.start()
+        
+        # Only consider invoice numbers that appear before this line item
+        if invoice_pos < line_item_pos:
+            distance = line_item_pos - invoice_pos
+            if distance < best_distance:
+                best_distance = distance
+                best_invoice = invoice_num
+    
+    return best_invoice
+
 def extract_short_product_code(full_text, description_text=""):
     """Extract product code from various formats"""
     # Combine both texts to search in
@@ -313,20 +351,41 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
             # Advanced parsing of the full line item text
             print(f"  Full line text: '{full_line_text}'")
             
-            # 1. Extract the correct product code (short alphanumeric code)
+            # 1. Check if this is a summary invoice and extract specific invoice number
+            specific_invoice_number = extract_specific_invoice_number(document.text, full_line_text)
+            if specific_invoice_number:
+                # Use the specific invoice number instead of the summary invoice number
+                invoice_number = specific_invoice_number
+                print(f"  -> Found specific invoice number: '{invoice_number}'")
+            
+            # 2. Extract the correct product code (short alphanumeric code)
             short_product_code = extract_short_product_code(full_line_text, item_description)
             if short_product_code:
                 product_code = short_product_code
                 print(f"  -> Found short product code: '{product_code}'")
             
-            # 2. Use Document AI unit_price if available, otherwise try to extract from text
+            # 3. For book invoices (with ISBNs), calculate wholesale price from amount ÷ quantity
+            is_book_invoice = product_code and (len(product_code) == 13 and product_code.startswith('978'))
+            
+            if is_book_invoice and line_total and quantity:
+                try:
+                    total_val = float(line_total.replace('$', ''))
+                    qty_val = int(quantity)
+                    if qty_val > 0:
+                        calculated_wholesale = total_val / qty_val
+                        unit_price = f"${calculated_wholesale:.2f}"
+                        print(f"  -> Book invoice: calculated wholesale price: {line_total} ÷ {quantity} = '{unit_price}'")
+                except (ValueError, ZeroDivisionError):
+                    print(f"  -> Error calculating wholesale price, using fallback")
+            
+            # Fallback for non-book invoices: use Document AI unit_price or extract from text
             if not unit_price:
-                # Try to extract wholesale price from text if Document AI didn't find it
+                # Try to extract wholesale price from text
                 wholesale_price = extract_wholesale_price(full_line_text)
                 if wholesale_price:
                     unit_price = wholesale_price
                     print(f"  -> Found wholesale price from text: '{unit_price}'")
-            else:
+            elif not is_book_invoice:
                 print(f"  -> Using Document AI unit_price: '{unit_price}'")
             
             # 3. Extract shipped quantity - prioritize Document AI property first
