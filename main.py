@@ -401,14 +401,18 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                     if prop.type_ == "line_item/quantity":
                         # Clean the quantity from Document AI property
                         qty_text = prop.mention_text.strip()
-                        # Extract first non-zero number from patterns like "8 00"
-                        qty_numbers = re.findall(r'\b(\d+)\b', qty_text)
-                        if qty_numbers:
-                            for num in qty_numbers:
-                                if int(num) > 0:
-                                    quantity = num
-                                    print(f"  -> Found quantity from property: '{quantity}'")
-                                    break
+                        # Handle decimal quantities like "6.00" or integer quantities like "8"
+                        qty_match = re.search(r'\b(\d+(?:\.\d+)?)\b', qty_text)
+                        if qty_match:
+                            qty_value = float(qty_match.group(1))
+                            if qty_value > 0:
+                                # Convert to integer if it's a whole number, otherwise keep as decimal
+                                if qty_value == int(qty_value):
+                                    quantity = str(int(qty_value))
+                                else:
+                                    quantity = str(qty_value)
+                                print(f"  -> Found quantity from property: '{quantity}'")
+                                break
                         break
             
             # Fallback to text parsing if no quantity found
@@ -432,10 +436,9 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
             elif product_code:
                 full_description = product_code
             
-            # Only add row if we have a meaningful description AND either price or quantity
-            # This filters out incomplete/malformed line items
-            if (full_description and len(full_description) > 5 and 
-                (unit_price or quantity)):
+            # Only add row if we have a meaningful description AND a price
+            # This filters out incomplete/malformed line items and backorders without prices
+            if (full_description and len(full_description) > 5 and unit_price):
                 
                 # Skip rows with zero amounts unless they have valid quantity
                 skip_row = False
