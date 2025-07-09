@@ -213,10 +213,19 @@ def extract_wholesale_price(full_text):
     price_pattern = r'\b(\d+\.\d{2})\b'
     prices = re.findall(price_pattern, full_text)
     
-    if len(prices) >= 2:
+    # Filter out quantities that appear at the end (backorder items)
+    # For backorder items like "SMG6H Smudge Hippo Tiny 6.00", the 6.00 is quantity, not price
+    filtered_prices = []
+    for price in prices:
+        # Skip if this looks like a quantity (single decimal at end of text)
+        if full_text.strip().endswith(price) and len(prices) == 1:
+            continue  # This is likely a quantity, not a price
+        filtered_prices.append(price)
+    
+    if len(filtered_prices) >= 2:
         # When we have multiple prices like "8.50 6.80 40.80"
         # The second price is typically the wholesale price
-        wholesale_price = prices[1]
+        wholesale_price = filtered_prices[1]
         
         # Validate it's a reasonable price (not a total amount)
         try:
@@ -226,10 +235,10 @@ def extract_wholesale_price(full_text):
         except ValueError:
             pass
     
-    elif len(prices) == 1:
+    elif len(filtered_prices) == 1:
         # Only one price found, use it
         try:
-            price_val = float(prices[0])
+            price_val = float(filtered_prices[0])
             if 0.01 <= price_val <= 500.00:
                 return f"${price_val:.2f}"
         except ValueError:
@@ -443,6 +452,8 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
             
             # Only add row if we have a meaningful description AND a price
             # This filters out incomplete/malformed line items and backorders without prices
+            print(f"  -> Checking item: desc='{full_description}' (len={len(full_description) if full_description else 0}), price='{unit_price}', qty='{quantity}'")
+            
             if (full_description and len(full_description) > 5 and unit_price):
                 
                 # Skip rows with zero amounts unless they have valid quantity
@@ -460,11 +471,11 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                         unit_price if unit_price else "",
                         quantity if quantity else ""
                     ])
-                    print(f"  -> Added row: {full_description}, {unit_price}, Qty: {quantity}")
+                    print(f"  -> ✓ ADDED row: {full_description}, {unit_price}, Qty: {quantity}")
                 else:
-                    print(f"  -> Skipped row (zero amount, no qty): {full_description}")
+                    print(f"  -> ✗ SKIPPED row (zero amount, no qty): {full_description}")
             else:
-                print(f"  -> Skipped row (insufficient data): desc='{full_description}', price='{unit_price}', qty='{quantity}'")
+                print(f"  -> ✗ SKIPPED row (insufficient data): desc='{full_description}', price='{unit_price}', qty='{quantity}'")
     
     print(f"Found {line_item_count} line_item entities, created {len(rows)} rows")
     return rows
