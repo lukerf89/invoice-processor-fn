@@ -64,14 +64,19 @@ def process_invoice(request):
     
     # Step 6: Extract line items from Document AI entities first
     rows = extract_line_items_from_entities(document, invoice_date, vendor, invoice_number)
+    print(f"Entity extraction returned {len(rows)} rows")
     
     # Step 6b: If no entity data found, try table parsing
     if not rows:
+        print("Falling back to table extraction...")
         rows = extract_line_items(document, invoice_date, vendor, invoice_number)
+        print(f"Table extraction returned {len(rows)} rows")
     
     # Step 6c: Final fallback to text-based parsing
     if not rows:
+        print("Falling back to text extraction...")
         rows = extract_line_items_from_text(document.text, invoice_date, vendor, invoice_number)
+        print(f"Text extraction returned {len(rows)} rows")
     
     if not rows:
         return jsonify({"warning": "No line items found in invoice", "text": document.text}), 200
@@ -519,8 +524,8 @@ def extract_line_items(document, invoice_date, vendor, invoice_number):
                             if not wholesale_price or "your" in header or "unit" in header:
                                 wholesale_price = clean_price(cells[idx])
                 
-                # Only add row if we have meaningful data
-                if item_description or wholesale_price:
+                # Only add row if we have meaningful data AND a price (exclude backorders)
+                if item_description and wholesale_price:
                     rows.append([
                         "",  # Empty placeholder for column A
                         invoice_date,
@@ -577,8 +582,8 @@ def extract_line_items_from_text(text, invoice_date, vendor, invoice_number):
             shipped_quantity = extract_shipped_quantity(full_line_context)
             quantity = shipped_quantity if shipped_quantity else ""
             
-            # Add row even if we only have product code (better to have incomplete data)
-            if product_code:
+            # Add row only if we have product code AND price (exclude backorders)
+            if product_code and price:
                 rows.append([
                     "",  # Empty placeholder for column A
                     invoice_date,
