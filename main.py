@@ -60,6 +60,14 @@ def process_invoice(request):
     invoice_number = entities.get("invoice_id", "")
     invoice_date = format_date(entities.get("invoice_date", ""))
     
+    # Fallback extraction for missing invoice number (look for order number)
+    if not invoice_number:
+        invoice_number = extract_order_number(document.text)
+    
+    # Fallback extraction for missing invoice date (look for order date)
+    if not invoice_date:
+        invoice_date = extract_order_date(document.text)
+    
     print(f"Extracted - Vendor: '{vendor}', Invoice#: '{invoice_number}', Date: '{invoice_date}'")
     
     # Step 6: Extract line items from Document AI entities first
@@ -115,6 +123,44 @@ def format_date(raw_date):
         return parsed_date.strftime("%m/%d/%Y")
     except Exception:
         return raw_date
+
+def extract_order_number(document_text):
+    """Extract order number from text patterns like 'Order #DYP49ACZYQ'"""
+    # Look for patterns like "Order #ABC123" or "Order #: ABC123"
+    order_patterns = [
+        r'Order\s*#\s*([A-Z0-9]+)',
+        r'Order\s*Number\s*:?\s*([A-Z0-9]+)',
+        r'Order\s*ID\s*:?\s*([A-Z0-9]+)'
+    ]
+    
+    for pattern in order_patterns:
+        match = re.search(pattern, document_text, re.IGNORECASE)
+        if match:
+            return match.group(1)
+    
+    return ""
+
+def extract_order_date(document_text):
+    """Extract order date from text patterns like 'placed on May 29, 2025'"""
+    # Look for patterns like "placed on May 29, 2025" or "Order Date: May 29, 2025"
+    date_patterns = [
+        r'placed\s+on\s+([A-Za-z]+ \d{1,2}, \d{4})',
+        r'Order\s+Date\s*:?\s*([A-Za-z]+ \d{1,2}, \d{4})',
+        r'Date\s*:?\s*([A-Za-z]+ \d{1,2}, \d{4})'
+    ]
+    
+    for pattern in date_patterns:
+        match = re.search(pattern, document_text, re.IGNORECASE)
+        if match:
+            date_str = match.group(1)
+            try:
+                # Parse date like "May 29, 2025" and convert to MM/DD/YY format
+                parsed_date = datetime.strptime(date_str, "%B %d, %Y")
+                return parsed_date.strftime("%m/%d/%y")
+            except ValueError:
+                return date_str
+    
+    return ""
 
 def clean_price(value):
     """Extract numeric price from string and format as currency"""
