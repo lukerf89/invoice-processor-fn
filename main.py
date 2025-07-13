@@ -401,6 +401,30 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
             # Store the full line item text for advanced parsing
             full_line_text = entity.mention_text.strip()
             
+            # Check if this line item contains multiple products (Creative-Coop style)
+            # Look for multiple DF/DA product codes in the same line
+            product_codes = re.findall(r'\b(D[A-Z]\d{4}[A-Z]?)\b', full_line_text)
+            if len(product_codes) > 1:
+                print(f"  -> Found multiple product codes: {product_codes}")
+                # Split this into multiple line items
+                split_items = split_combined_line_item(full_line_text, entity)
+                for split_item in split_items:
+                    if (split_item and 
+                        len(split_item.get('description', '')) > 5 and 
+                        split_item.get('unit_price') and 
+                        split_item['unit_price'] != "$0.00"):  # Must have valid price
+                        rows.append([
+                            "",  # Column A placeholder
+                            invoice_date,
+                            vendor, 
+                            invoice_number,
+                            split_item['description'],
+                            split_item['unit_price'],
+                            split_item.get('quantity', '')
+                        ])
+                        print(f"  -> ✓ ADDED split item: {split_item['description']}, {split_item['unit_price']}, Qty: {split_item.get('quantity', '')}")
+                continue  # Skip the normal processing for this combined item
+            
             # Process properties of the line item
             if hasattr(entity, 'properties') and entity.properties:
                 print(f"  Line item {line_item_count} properties:")
@@ -660,6 +684,87 @@ def extract_line_items_from_text(text, invoice_date, vendor, invoice_number):
                 ])
     
     return rows
+
+def split_combined_line_item(full_line_text, entity):
+    """Split combined line items that contain multiple products (Creative-Coop style)"""
+    items = []
+    
+    # Find all product codes and their positions
+    product_matches = list(re.finditer(r'\b(D[A-Z]\d{4}[A-Z]?)\b', full_line_text))
+    
+    # Try a different approach: look for description BEFORE each product code
+    lines = full_line_text.split('\n')
+    
+    for i, match in enumerate(product_matches):
+        product_code = match.group(1)
+        
+        # Find which line contains this product code
+        product_line_idx = -1
+        for line_idx, line in enumerate(lines):
+            if product_code in line:
+                product_line_idx = line_idx
+                break
+        
+        # Look for description in the line before the product code
+        description = ""
+        if product_line_idx > 0:
+            # Description is typically in the line above the product code
+            description = lines[product_line_idx - 1].strip()
+            # Clean up description
+            description = ' '.join(description.split())
+        elif product_line_idx == 0:
+            # Product code is on first line, look after it
+            line_content = lines[product_line_idx]
+            after_code = line_content.split(product_code, 1)
+            if len(after_code) > 1:
+                # Look for description after UPC code
+                remaining = after_code[1].strip()
+                # Remove UPC if present
+                remaining = re.sub(r'^\d{12}\s*', '', remaining)
+                if remaining and not re.match(r'^\d', remaining):  # Not starting with numbers
+                    description = remaining.split('\n')[0].strip()
+        
+        # Look for pricing info from the entire text (Creative-Coop has scattered pricing)
+        unit_price = ""
+        quantity = ""
+        
+        # Extract the section around this product for pricing
+        start_pos = max(0, match.start() - 200)  # Look 200 chars before
+        end_pos = min(len(full_line_text), match.end() + 200)  # Look 200 chars after
+        context_section = full_line_text[start_pos:end_pos]
+        
+        # Try to extract price from nearby context
+        price_pattern = r'\b(\d+\.\d{2})\b'
+        price_matches = re.findall(price_pattern, context_section)
+        if price_matches:
+            # Look for reasonable unit prices
+            for price in price_matches:
+                price_val = float(price)
+                if 1.00 <= price_val <= 100.00:  # Reasonable unit price range
+                    unit_price = f"${price_val:.2f}"
+                    break
+        
+        # Try to extract quantity (look for numbers before "each" or "Set")
+        qty_patterns = [
+            r'\b(\d+)\s+\d+\s+(?:each|Set)',  # "8 0 each" or "6 0 Set"
+            r'\b(\d+)\s+(?:each|Set)'         # "8 each" or "6 Set"
+        ]
+        
+        for pattern in qty_patterns:
+            qty_match = re.search(pattern, context_section)
+            if qty_match:
+                quantity = qty_match.group(1)
+                break
+        
+        # If we found a description, add this item (even without price for now)
+        if description and len(description) > 3:
+            items.append({
+                'description': f"{product_code} - {description}",
+                'unit_price': unit_price if unit_price else "$0.00",  # Placeholder
+                'quantity': quantity
+            })
+    
+    return items
 
 def detect_vendor_type(document_text):
     """Detect the vendor type based on document content"""
