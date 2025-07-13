@@ -539,6 +539,11 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                 if line_total == "$0.00" and not quantity:
                     skip_row = True
                 
+                # Skip rows with quantity = 0 (backorders)
+                if quantity and str(quantity).strip() == "0":
+                    skip_row = True
+                    print(f"  -> ✗ SKIPPED row (quantity=0): {full_description}")
+                
                 if not skip_row:
                     rows.append([
                         "",  # Column A placeholder
@@ -551,7 +556,8 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                     ])
                     print(f"  -> ✓ ADDED row: {full_description}, {unit_price}, Qty: {quantity}")
                 else:
-                    print(f"  -> ✗ SKIPPED row (zero amount, no qty): {full_description}")
+                    if line_total == "$0.00" and not quantity:
+                        print(f"  -> ✗ SKIPPED row (zero amount, no qty): {full_description}")
             else:
                 print(f"  -> ✗ SKIPPED row (insufficient data): desc='{full_description}', price='{unit_price}', qty='{quantity}'")
     
@@ -614,15 +620,26 @@ def extract_line_items(document, invoice_date, vendor, invoice_number):
                                 wholesale_price = clean_price(cells[idx])
                 
                 # Only add row if we have meaningful data AND a price (exclude backorders)
+                # Also skip items with quantity = 0
                 if item_description and wholesale_price:
-                    rows.append([
-                        "",  # Empty placeholder for column A
-                        invoice_date,
-                        vendor,
-                        invoice_number,
-                        item_description,
-                        wholesale_price
-                    ])
+                    # Check if this row has quantity information and skip if quantity = 0
+                    has_zero_quantity = False
+                    for idx, header in enumerate(headers):
+                        if idx < len(cells) and "quantity" in header.lower():
+                            if cells[idx].strip() == "0":
+                                has_zero_quantity = True
+                                break
+                    
+                    if not has_zero_quantity:
+                        rows.append([
+                            "",  # Empty placeholder for column A
+                            invoice_date,
+                            vendor,
+                            invoice_number,
+                            item_description,
+                            wholesale_price,
+                            ""  # Quantity placeholder
+                        ])
     
     return rows
 
@@ -671,8 +688,8 @@ def extract_line_items_from_text(text, invoice_date, vendor, invoice_number):
             shipped_quantity = extract_shipped_quantity(full_line_context)
             quantity = shipped_quantity if shipped_quantity else ""
             
-            # Add row only if we have product code AND price (exclude backorders)
-            if product_code and price:
+            # Add row only if we have product code AND price AND quantity > 0 (exclude backorders)
+            if product_code and price and quantity and str(quantity).strip() != "0":
                 rows.append([
                     "",  # Empty placeholder for column A
                     invoice_date,
@@ -756,8 +773,8 @@ def split_combined_line_item(full_line_text, entity):
                 quantity = qty_match.group(1)
                 break
         
-        # If we found a description, add this item (even without price for now)
-        if description and len(description) > 3:
+        # If we found a description and quantity > 0, add this item
+        if description and len(description) > 3 and quantity and str(quantity).strip() != "0":
             items.append({
                 'description': f"{product_code} - {description}",
                 'unit_price': unit_price if unit_price else "$0.00",  # Placeholder
