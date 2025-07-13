@@ -407,7 +407,7 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
             if len(product_codes) > 1:
                 print(f"  -> Found multiple product codes: {product_codes}")
                 # Split this into multiple line items
-                split_items = split_combined_line_item(full_line_text, entity)
+                split_items = split_combined_line_item(full_line_text, entity, document.text)
                 for split_item in split_items:
                     if (split_item and 
                         len(split_item.get('description', '')) > 5 and 
@@ -521,8 +521,8 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
             # Create a complete description with product code and UPC if available
             full_description = ""
             if product_code:
-                # Extract UPC code from the full line text
-                upc_code = extract_upc_from_text(full_line_text)
+                # Extract UPC code from the full line text, specific to this product code
+                upc_code = extract_upc_from_text(full_line_text, product_code)
                 
                 # For description, use the full line text which contains more context
                 # than just the item_description property
@@ -554,10 +554,12 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                 if line_total == "$0.00" and not quantity:
                     skip_row = True
                 
-                # Skip rows with quantity = 0 (backorders)
-                if quantity and str(quantity).strip() == "0":
-                    skip_row = True
-                    print(f"  -> ✗ SKIPPED row (quantity=0): {full_description}")
+                # Note: Temporarily removing quantity=0 filter as Document AI 
+                # is incorrectly marking many valid items as quantity=0
+                # Will re-implement with better quantity extraction
+                # if quantity and str(quantity).strip() == "0":
+                #     skip_row = True
+                #     print(f"  -> ✗ SKIPPED row (quantity=0): {full_description}")
                 
                 if not skip_row:
                     rows.append([
@@ -634,27 +636,17 @@ def extract_line_items(document, invoice_date, vendor, invoice_number):
                             if not wholesale_price or "your" in header or "unit" in header:
                                 wholesale_price = clean_price(cells[idx])
                 
-                # Only add row if we have meaningful data AND a price (exclude backorders)
-                # Also skip items with quantity = 0
+                # Only add row if we have meaningful data AND a price
                 if item_description and wholesale_price:
-                    # Check if this row has quantity information and skip if quantity = 0
-                    has_zero_quantity = False
-                    for idx, header in enumerate(headers):
-                        if idx < len(cells) and "quantity" in header.lower():
-                            if cells[idx].strip() == "0":
-                                has_zero_quantity = True
-                                break
-                    
-                    if not has_zero_quantity:
-                        rows.append([
-                            "",  # Empty placeholder for column A
-                            invoice_date,
-                            vendor,
-                            invoice_number,
-                            item_description,
-                            wholesale_price,
-                            ""  # Quantity placeholder
-                        ])
+                    rows.append([
+                        "",  # Empty placeholder for column A
+                        invoice_date,
+                        vendor,
+                        invoice_number,
+                        item_description,
+                        wholesale_price,
+                        ""  # Quantity placeholder
+                    ])
     
     return rows
 
@@ -703,8 +695,8 @@ def extract_line_items_from_text(text, invoice_date, vendor, invoice_number):
             shipped_quantity = extract_shipped_quantity(full_line_context)
             quantity = shipped_quantity if shipped_quantity else ""
             
-            # Add row only if we have product code AND price AND quantity > 0 (exclude backorders)
-            if product_code and price and quantity and str(quantity).strip() != "0":
+            # Add row only if we have product code AND price (removed quantity filter temporarily)
+            if product_code and price:
                 rows.append([
                     "",  # Empty placeholder for column A
                     invoice_date,
@@ -717,14 +709,50 @@ def extract_line_items_from_text(text, invoice_date, vendor, invoice_number):
     
     return rows
 
-def extract_upc_from_text(text):
-    """Extract UPC code from text (12-13 digit codes)"""
+def extract_upc_from_text(text, product_code=None):
+    """Extract UPC code from text (12-13 digit codes), optionally specific to a product code"""
     # Look for 12-13 digit UPC codes
     upc_patterns = [
         r'\b(\d{12,13})\b',  # Standard UPC
         r'\b(0\d{11,12})\b'  # UPC with leading zero
     ]
     
+    # If we have a product code, try to find UPC near it
+    if product_code:
+        # Look for UPC codes near the product code
+        import re
+        product_pos = text.find(product_code)
+        if product_pos != -1:
+            # FIRST: Search for UPC AFTER the product code (most reliable for Creative-Coop)
+            after_product = text[product_pos + len(product_code):product_pos + len(product_code) + 100]
+            for pattern in upc_patterns:
+                matches = re.findall(pattern, after_product)
+                if matches:
+                    # Return the first valid UPC after this product code
+                    for match in matches:
+                        if len(match) >= 12:
+                            # Ensure it starts with 0 if it's 12 digits
+                            if len(match) == 12 and not match.startswith('0'):
+                                return f"0{match}"
+                            return match
+            
+            # FALLBACK: Search in a wider window around the product code (±200 chars)
+            start = max(0, product_pos - 200)
+            end = min(len(text), product_pos + 200)
+            context = text[start:end]
+            
+            for pattern in upc_patterns:
+                matches = re.findall(pattern, context)
+                if matches:
+                    # Return the first valid UPC near this product code
+                    for match in matches:
+                        if len(match) >= 12:
+                            # Ensure it starts with 0 if it's 12 digits
+                            if len(match) == 12 and not match.startswith('0'):
+                                return f"0{match}"
+                            return match
+    
+    # Fallback: look for any UPC in the text
     for pattern in upc_patterns:
         matches = re.findall(pattern, text)
         if matches:
@@ -750,8 +778,8 @@ def clean_item_description(description, product_code, upc_code):
     
     # Strategy 1: Look for description that starts with dimensions or quoted text
     desc_patterns = [
-        r'(\d+(?:["\'-]\d+)*["\']?[LWH]?[^0-9\n]{10,})',  # Starts with dimensions like '3-1/4"L x 4"H...'
-        r'(S/\d+[^0-9\n]{5,})',  # Sets like 'S/3 11-3/4" Rnd...'
+        r'(S/\d+\s+.{10,})',  # Sets like 'S/3 11-3/4" Rnd...' or 'S/4 18" Sq Cotton...' - CHECK FIRST
+        r'(\d+(?:["\'-]\d+)*["\']?[LWH][^0-9\n]{10,})',  # Starts with dimensions like '3-1/4"L x 4"H...' - Must have L/W/H
         r'([A-Z][^0-9\n]{15,})',  # Text starting with capital, at least 15 chars
         r'"([^"]+)"',  # Quoted text
     ]
@@ -847,18 +875,67 @@ def extract_description_from_full_text(full_text, product_code, upc_code):
     # Fallback: try to clean what we have
     return clean_item_description(full_text, product_code, upc_code)
 
-def split_combined_line_item(full_line_text, entity):
+def split_combined_line_item(full_line_text, entity, document_text=None):
     """Split combined line items that contain multiple products (Creative-Coop style)"""
     items = []
     
-    # Find all product codes and their positions
-    product_matches = list(re.finditer(r'\b(D[A-Z]\d{4}[A-Z]?)\b', full_line_text))
+    # Pattern: Description → ProductCode → UPC → Description → ProductCode → UPC
+    # Use regex to find product codes with their immediately following UPC codes (same line)
+    product_upc_pattern = r'\b(D[A-Z]\d{4}[A-Z]?)\s+(\d{12})'
+    product_upc_matches = re.findall(product_upc_pattern, full_line_text)
     
-    # Try a different approach: look for description BEFORE each product code
+    # Also find product codes without UPC codes
+    all_product_codes = re.findall(r'\b(D[A-Z]\d{4}[A-Z]?)\b', full_line_text)
+    
+    # Split text by lines to find descriptions and UPC codes
     lines = full_line_text.split('\n')
     
-    for i, match in enumerate(product_matches):
-        product_code = match.group(1)
+    # For each product code found
+    for product_code in all_product_codes:
+        # Find the UPC code for this product (if any)
+        upc_code = None
+        
+        # First try to find UPC on same line as product code
+        for prod, upc in product_upc_matches:
+            if prod == product_code:
+                # Ensure UPC starts with 0 if it's 12 digits
+                if len(upc) == 12 and not upc.startswith('0'):
+                    upc_code = f"0{upc}"
+                else:
+                    upc_code = upc
+                break
+        
+        # If no UPC found on same line, look for UPC in nearby lines within entity
+        if not upc_code:
+            # Find which line contains this product code
+            product_line_idx = -1
+            for line_idx, line in enumerate(lines):
+                if product_code in line:
+                    product_line_idx = line_idx
+                    break
+            
+            # Look for UPC in the next few lines after the product code
+            if product_line_idx != -1:
+                for search_line_idx in range(product_line_idx + 1, min(len(lines), product_line_idx + 3)):
+                    line_text = lines[search_line_idx].strip()
+                    # Look for standalone UPC codes
+                    upc_match = re.search(r'\b(\d{12,13})\b', line_text)
+                    if upc_match:
+                        upc_candidate = upc_match.group(1)
+                        # Ensure it's a valid UPC format
+                        if len(upc_candidate) == 12 and not upc_candidate.startswith('0'):
+                            upc_code = f"0{upc_candidate}"
+                        elif len(upc_candidate) in [12, 13]:
+                            upc_code = upc_candidate
+                        break
+        
+        # If still no UPC found, try to extract from the full document text
+        if not upc_code and document_text:
+            # Try to find UPC in the document text near this product code
+            upc_code = extract_upc_from_text(document_text, product_code)
+        
+        # Find the description for this product code
+        description = ""
         
         # Find which line contains this product code
         product_line_idx = -1
@@ -867,61 +944,87 @@ def split_combined_line_item(full_line_text, entity):
                 product_line_idx = line_idx
                 break
         
-        # Look for description in the line before the product code
-        description = ""
-        if product_line_idx > 0:
-            # Description is typically in the line above the product code
-            description = lines[product_line_idx - 1].strip()
-            # Clean up description
-            description = ' '.join(description.split())
-        elif product_line_idx == 0:
-            # Product code is on first line, look after it
-            line_content = lines[product_line_idx]
-            after_code = line_content.split(product_code, 1)
-            if len(after_code) > 1:
-                # Look for description after UPC code
-                remaining = after_code[1].strip()
-                # Remove UPC if present
-                remaining = re.sub(r'^\d{12}\s*', '', remaining)
-                if remaining and not re.match(r'^\d', remaining):  # Not starting with numbers
-                    description = remaining.split('\n')[0].strip()
+        # Look for description - could be in several places
         
-        # Look for pricing info from the entire text (Creative-Coop has scattered pricing)
+        # Case 1: FIRST try description on the same line as the product code (after the product code)
+        # This has higher priority for Creative-Coop invoices
+        if product_line_idx != -1:
+            current_line = lines[product_line_idx].strip()
+            # Extract description that appears after the product code on the same line
+            product_pos_in_line = current_line.find(product_code)
+            if product_pos_in_line != -1:
+                # Look for text after the product code
+                after_product = current_line[product_pos_in_line + len(product_code):].strip()
+                # Extract description pattern (everything before pricing info)
+                # Look for patterns like "S/4 18" Sq Cotton Embroidered Napkins, Tied w Twill Tape"
+                # followed by numbers that indicate pricing/quantity (like "8 0 each")
+                desc_match = re.search(r'^\s*(.+?)(?:\s+\d+\s+\d+\s+(?:each|lo|Set)|\s+TRF)', after_product)
+                if desc_match:
+                    candidate_desc = desc_match.group(1).strip()
+                    if len(candidate_desc) > 10:
+                        description = candidate_desc
+        
+        # Case 2: If no description found on same line, try the line above (fallback)
+        if (not description or len(description) < 5) and product_line_idx > 0:
+            description = lines[product_line_idx - 1].strip()
+            description = ' '.join(description.split())
+        
+        # Case 3: For Creative-Coop, sometimes the description comes AFTER the UPC code
+        # Pattern: ProductCode → UPC → Description
+        if (not description or len(description) < 5) and upc_code and product_line_idx != -1:
+            # Look for description in lines after the product code
+            for desc_line_idx in range(product_line_idx + 1, min(len(lines), product_line_idx + 4)):
+                candidate_line = lines[desc_line_idx].strip()
+                # Skip UPC codes and numeric-only lines
+                if (candidate_line and 
+                    not re.match(r'^\d{12,13}$', candidate_line) and  # Not UPC
+                    not re.match(r'^[\d\s\.]+$', candidate_line) and   # Not just numbers
+                    len(candidate_line) > 10):                         # Substantial length
+                    description = candidate_line
+                    break
+        
+        # If still no good description found, try other methods
+        if not description or len(description) < 5:
+            # Look for description patterns around this product code
+            product_pos = full_line_text.find(product_code)
+            if product_pos > 0:
+                # Look backward for a description
+                before_text = full_line_text[:product_pos]
+                desc_patterns = [
+                    r'([^\n]{15,})\s*$',  # Last line before product code
+                    r'(\d+["\'-]\d+["\']?[LWH]?\s+[^\n]{10,})',  # Dimension descriptions
+                    r'(S/\d+\s+[^\n]{10,})',  # Set descriptions
+                ]
+                
+                for pattern in desc_patterns:
+                    matches = re.findall(pattern, before_text)
+                    if matches:
+                        candidate = matches[-1].strip()  # Get the last/closest match
+                        if len(candidate) > 5:
+                            description = candidate
+                            break
+        
+        # Extract pricing and quantity info from entity properties if available
         unit_price = ""
         quantity = ""
         
-        # Extract the section around this product for pricing
-        start_pos = max(0, match.start() - 200)  # Look 200 chars before
-        end_pos = min(len(full_line_text), match.end() + 200)  # Look 200 chars after
-        context_section = full_line_text[start_pos:end_pos]
+        if hasattr(entity, 'properties') and entity.properties:
+            for prop in entity.properties:
+                if prop.type_ == "line_item/unit_price":
+                    unit_price = clean_price(prop.mention_text)
+                elif prop.type_ == "line_item/quantity":
+                    # Clean the quantity
+                    qty_text = prop.mention_text.strip()
+                    qty_match = re.search(r'\b(\d+(?:\.\d+)?)\b', qty_text)
+                    if qty_match:
+                        qty_value = float(qty_match.group(1))
+                        if qty_value == int(qty_value):
+                            quantity = str(int(qty_value))
+                        else:
+                            quantity = str(qty_value)
         
-        # Try to extract price from nearby context
-        price_pattern = r'\b(\d+\.\d{2})\b'
-        price_matches = re.findall(price_pattern, context_section)
-        if price_matches:
-            # Look for reasonable unit prices
-            for price in price_matches:
-                price_val = float(price)
-                if 1.00 <= price_val <= 100.00:  # Reasonable unit price range
-                    unit_price = f"${price_val:.2f}"
-                    break
-        
-        # Try to extract quantity (look for numbers before "each" or "Set")
-        qty_patterns = [
-            r'\b(\d+)\s+\d+\s+(?:each|Set)',  # "8 0 each" or "6 0 Set"
-            r'\b(\d+)\s+(?:each|Set)'         # "8 each" or "6 Set"
-        ]
-        
-        for pattern in qty_patterns:
-            qty_match = re.search(pattern, context_section)
-            if qty_match:
-                quantity = qty_match.group(1)
-                break
-        
-        # If we found a description and quantity > 0, add this item
-        if description and len(description) > 3 and quantity and str(quantity).strip() != "0":
-            # Extract UPC and clean description for split items too
-            upc_code = extract_upc_from_text(context_section)
+        # If we found a good description, add this item
+        if description and len(description) > 3:
             clean_description = clean_item_description(description, product_code, upc_code)
             
             if upc_code:
@@ -931,7 +1034,7 @@ def split_combined_line_item(full_line_text, entity):
             
             items.append({
                 'description': formatted_description,
-                'unit_price': unit_price if unit_price else "$0.00",  # Placeholder
+                'unit_price': unit_price if unit_price else "$0.00",
                 'quantity': quantity
             })
     
