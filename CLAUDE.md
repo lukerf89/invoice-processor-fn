@@ -69,6 +69,11 @@ python document_ai_explorer.py new_invoice.pdf --save-json
 - `extract_shipped_quantity()` - Parses quantity from various formats
 - `extract_specific_invoice_number()` - Handles summary invoices with multiple invoice numbers
 
+### Creative-Coop Specialized Processing
+- `extract_creative_coop_quantity()` - Specialized quantity extraction for Creative-Coop invoices
+- `split_combined_line_item()` - Handles combined Document AI entities with multiple products
+- `extract_upc_from_text()` - Enhanced UPC extraction for combined line items
+
 ### HarperCollins Specialized Processing
 - `process_harpercollins_document()` - Perfect HarperCollins PO processing
 - `get_harpercollins_book_data()` - ISBN/title/price mapping for HarperCollins books
@@ -95,6 +100,13 @@ GOOGLE_SHEETS_SHEET_NAME=Sheet1  # optional, defaults to 'Sheet1'
 - **Quantity extraction**: Handles various quantity formats and units
 - **Date standardization**: Normalizes date formats across invoice types
 - **Vendor extraction**: Uses confidence scoring to identify best vendor match
+
+### Creative-Coop Specialized Features
+- **Combined entity processing**: Handles multiple products in single Document AI entities
+- **Quantity pattern matching**: Extracts quantities from "shipped back unit" patterns (e.g., "8 0 lo each", "6 0 Set")
+- **Split line item support**: Correctly processes combined line items with multiple product codes and UPC codes
+- **Enhanced UPC extraction**: Searches for UPC codes positioned after product codes in document text
+- **Pattern-specific extraction**: Uses context-aware matching for complex quantity patterns
 
 ### HarperCollins Specialized Features
 - **Perfect PO processing**: 100% accurate extraction of all 23 line items
