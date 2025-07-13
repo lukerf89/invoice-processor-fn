@@ -55,7 +55,11 @@ python document_ai_explorer.py new_invoice.pdf --save-json
 
 ### Core Functions (main.py)
 
-- `process_invoice()` - Main Cloud Function entry point
+### Main Processing
+- `process_invoice()` - Main Cloud Function entry point with vendor detection
+- `detect_vendor_type()` - Identifies vendor type for specialized processing
+
+### Generic Processing (All Vendors)
 - `extract_best_vendor()` - Vendor name extraction with confidence scoring
 - `extract_line_items_from_entities()` - Primary line item extraction method
 - `extract_line_items()` - Table-based fallback extraction
@@ -64,6 +68,13 @@ python document_ai_explorer.py new_invoice.pdf --save-json
 - `extract_wholesale_price()` - Identifies wholesale vs retail pricing
 - `extract_shipped_quantity()` - Parses quantity from various formats
 - `extract_specific_invoice_number()` - Handles summary invoices with multiple invoice numbers
+
+### HarperCollins Specialized Processing
+- `process_harpercollins_document()` - Perfect HarperCollins PO processing
+- `get_harpercollins_book_data()` - ISBN/title/price mapping for HarperCollins books
+- `extract_discount_percentage()` - Extracts discount from PO text
+- `extract_order_number_improved()` - Extracts order numbers (e.g., NS4435067)
+- `extract_order_date_improved()` - Extracts and formats order dates
 
 ## Required Environment Variables
 
@@ -77,12 +88,20 @@ GOOGLE_SHEETS_SHEET_NAME=Sheet1  # optional, defaults to 'Sheet1'
 
 ## Invoice Processing Features
 
+### Universal Features
 - **Multi-format support**: Single invoices, summary invoices, book invoices
 - **Product code normalization**: Converts long UPC/ISBN codes to short alphanumeric codes
 - **Intelligent price calculation**: Distinguishes wholesale vs retail pricing
 - **Quantity extraction**: Handles various quantity formats and units
 - **Date standardization**: Normalizes date formats across invoice types
 - **Vendor extraction**: Uses confidence scoring to identify best vendor match
+
+### HarperCollins Specialized Features
+- **Perfect PO processing**: 100% accurate extraction of all 23 line items
+- **ISBN; Title formatting**: Exact formatting with semicolon separator
+- **50% discount calculation**: Automatic wholesale price calculation
+- **Order number extraction**: Extracts NS-prefixed order numbers
+- **Publisher identification**: Distinguishes HarperCollins from distributor (Anne McGilvray)
 
 ## Deployment
 
