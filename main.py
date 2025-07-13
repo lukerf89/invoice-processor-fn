@@ -786,8 +786,8 @@ def process_harpercollins_document(document):
             quantity = data['qty']
             title = data['title']
             
-            # Format exactly like expected: ISBN; Title
-            description = f"{isbn}; {title}"
+            # Format exactly like expected: ISBN - Title
+            description = f"{isbn} - {title}"
             
             # Format price with proper decimals
             if wholesale_price == int(wholesale_price):
