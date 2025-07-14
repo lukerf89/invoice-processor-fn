@@ -51,18 +51,47 @@ def process_invoice(request: Request):
         try:
             # Special handling for Trello URLs
             if 'trello.com' in file_url:
-                # Trello URLs often work with proper headers and session handling
+                # Try multiple authentication strategies for Trello
                 session = requests.Session()
+                
+                # Strategy 1: Use cookies and referrer
                 session.headers.update({
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     'Accept': 'application/pdf,application/octet-stream,*/*',
                     'Accept-Language': 'en-US,en;q=0.9',
                     'Accept-Encoding': 'gzip, deflate, br',
                     'Connection': 'keep-alive',
-                    'Upgrade-Insecure-Requests': '1'
+                    'Upgrade-Insecure-Requests': '1',
+                    'Referer': 'https://trello.com/',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'same-origin'
                 })
                 
+                # First, try to get the main Trello page to establish session
+                try:
+                    card_id = file_url.split('/cards/')[1].split('/')[0]
+                    card_url = f"https://trello.com/c/{card_id}"
+                    session.get(card_url, timeout=10)
+                except:
+                    pass  # Continue even if this fails
+                
+                # Try the direct download
                 response = session.get(file_url, allow_redirects=True, timeout=30)
+                
+                # If 401, try removing the /download/filename part
+                if response.status_code == 401:
+                    base_attachment_url = file_url.split('/download/')[0]
+                    response = session.get(base_attachment_url, allow_redirects=True, timeout=30)
+                
+                # If still 401, try with different headers
+                if response.status_code == 401:
+                    session.headers.update({
+                        'Authorization': '',  # Remove any auth headers
+                        'Cookie': '',  # Clear cookies
+                    })
+                    response = session.get(file_url, allow_redirects=True, timeout=30)
+                
             else:
                 # Regular download for other URLs
                 response = requests.get(file_url, timeout=30)
@@ -75,7 +104,11 @@ def process_invoice(request: Request):
                 return jsonify({"error": "Downloaded file is not a PDF"}), 400
                 
         except requests.exceptions.RequestException as e:
-            return jsonify({"error": f"Failed to download PDF: {str(e)}"}), 500
+            # If download fails, return a more helpful error with suggestion
+            error_msg = f"Failed to download PDF: {str(e)}"
+            if '401' in str(e) and 'trello.com' in file_url:
+                error_msg += ". Trello attachment may require board access permissions. Consider using a public file sharing service instead."
+            return jsonify({"error": error_msg}), 500
 
         pdf_content = response.content
         print(f"Downloaded PDF from URL: {file_url}")
