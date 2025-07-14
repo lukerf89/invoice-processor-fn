@@ -50,12 +50,5 @@ test_invoices/
 *.pdf
 *_docai_output.json
 
-# Development/debug files
-analyze_expected.py
-check_sheets.py
-debug_descriptions.py
-final_corrected_processing.py
-improved_processing.py
-improved_processing_v2.py
-test_invoice_processing.py
-test_sheets.py
+# Development/debug files (now in test_scripts/)
+test_scripts/
