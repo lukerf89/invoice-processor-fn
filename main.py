@@ -32,10 +32,18 @@ def process_invoice(request: Request):
         print(f"Received file upload: {filename}")
         
     else:
-        # Fallback to old JSON file URL method for backward compatibility
-        request_json = request.get_json(silent=True)
+        # Handle form data from Zapier
+        file_url = None
         
-        file_url = request_json.get('file_url') if request_json else None
+        # First try to get from form data (Zapier sends form data)
+        if request.form:
+            file_url = request.form.get('file_url') or request.form.get('invoice_file')
+        
+        # Fallback to JSON method for backward compatibility
+        if not file_url:
+            request_json = request.get_json(silent=True)
+            file_url = request_json.get('file_url') if request_json else None
+        
         if not file_url:
             return jsonify({"error": "Missing invoice_file or file_url"}), 400
 
