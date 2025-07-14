@@ -49,8 +49,31 @@ def process_invoice(request: Request):
 
         # Step 2: Download the PDF from URL
         try:
-            response = requests.get(file_url)
+            # Special handling for Trello URLs
+            if 'trello.com' in file_url:
+                # Trello URLs often work with proper headers and session handling
+                session = requests.Session()
+                session.headers.update({
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'application/pdf,application/octet-stream,*/*',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1'
+                })
+                
+                response = session.get(file_url, allow_redirects=True, timeout=30)
+            else:
+                # Regular download for other URLs
+                response = requests.get(file_url, timeout=30)
+            
             response.raise_for_status()
+            
+            # Verify we got a PDF
+            content_type = response.headers.get('content-type', '').lower()
+            if 'pdf' not in content_type and not file_url.lower().endswith('.pdf'):
+                return jsonify({"error": "Downloaded file is not a PDF"}), 400
+                
         except requests.exceptions.RequestException as e:
             return jsonify({"error": f"Failed to download PDF: {str(e)}"}), 500
 
