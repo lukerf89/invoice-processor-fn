@@ -593,40 +593,69 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                         quantity = shipped_quantity
                         print(f"  -> Found shipped quantity from text: '{quantity}'")
             
-            # If no description but we have the main entity text, use that
-            if not item_description and entity.mention_text:
-                item_description = entity.mention_text.strip()
-            
-            # Create a complete description with product code and UPC if available
+            # For most invoices, use the Document AI description directly as it's usually accurate
+            # Only apply cleaning for Creative-Coop style invoices or if description is missing
             full_description = ""
             if product_code:
-                # Extract UPC code from the full line text, specific to this product code
-                upc_code = extract_upc_from_text(full_line_text, product_code)
-                
-                # For description, use the full line text which contains more context
-                # than just the item_description property
-                description_source = item_description if item_description else full_line_text
-                clean_description = clean_item_description(description_source, product_code, upc_code)
-                
-                # If clean description is too short or poor quality, try extracting from full line text
-                if not clean_description or len(clean_description) < 10:
-                    clean_description = extract_description_from_full_text(full_line_text, product_code, upc_code)
-                
-                if upc_code:
-                    full_description = f"{product_code} - UPC: {upc_code} - {clean_description}"
+                # Check if we have a good Document AI description
+                if item_description and len(item_description) > 5:
+                    # Use Document AI description directly for most vendors (like Rifle)
+                    # Only apply heavy cleaning for Creative-Coop style complex invoices
+                    if any(indicator in vendor.lower() for indicator in ['creative', 'coop']):
+                        # Apply full cleaning for Creative-Coop
+                        upc_code = extract_upc_from_text(full_line_text, product_code)
+                        clean_description = clean_item_description(item_description, product_code, upc_code)
+                        if upc_code:
+                            full_description = f"{product_code} - UPC: {upc_code} - {clean_description}"
+                        else:
+                            full_description = f"{product_code} - {clean_description}"
+                    else:
+                        # For other vendors (like Rifle), use Document AI description directly
+                        full_description = f"{product_code} - {item_description}"
                 else:
-                    full_description = f"{product_code} - {clean_description}"
+                    # Fallback to extraction if no good Document AI description
+                    upc_code = extract_upc_from_text(full_line_text, product_code)
+                    description_source = full_line_text
+                    clean_description = clean_item_description(description_source, product_code, upc_code)
+                    
+                    if not clean_description or len(clean_description) < 10:
+                        clean_description = extract_description_from_full_text(full_line_text, product_code, upc_code)
+                    
+                    if upc_code:
+                        full_description = f"{product_code} - UPC: {upc_code} - {clean_description}"
+                    else:
+                        full_description = f"{product_code} - {clean_description}"
             elif item_description:
                 full_description = item_description
             else:
                 # Use full line text as fallback
                 full_description = full_line_text.strip()
             
-            # Only add row if we have a meaningful description AND a price
+            # Filter out unwanted items (shipping, out of stock, etc.)
+            skip_item = False
+            if product_code:
+                # Skip shipping items
+                if product_code.upper() in ['SHIP', 'SHIPPING']:
+                    skip_item = True
+                    print(f"  -> ✗ SKIPPED row (shipping item): {full_description}")
+                # Skip out of stock items
+                elif product_code.upper() in ['NOT IN STOCK', 'OOS', 'OUT OF STOCK']:
+                    skip_item = True
+                    print(f"  -> ✗ SKIPPED row (out of stock): {full_description}")
+            
+            # Also check description for shipping/out of stock indicators
+            if not skip_item and full_description:
+                desc_lower = full_description.lower()
+                if ('not in stock' in desc_lower or 'oos' in desc_lower or 
+                    'ship' in desc_lower and len(full_description) < 30):  # Short shipping descriptions
+                    skip_item = True
+                    print(f"  -> ✗ SKIPPED row (unwanted item): {full_description}")
+            
+            # Only add row if we have a meaningful description AND a price AND it's not skipped
             # This filters out incomplete/malformed line items and backorders without prices
             print(f"  -> Checking item: desc='{full_description}' (len={len(full_description) if full_description else 0}), price='{unit_price}', qty='{quantity}'")
             
-            if (full_description and len(full_description) > 5 and unit_price):
+            if (full_description and len(full_description) > 5 and unit_price and not skip_item):
                 
                 # Skip rows with zero amounts unless they have valid quantity
                 skip_row = False
@@ -655,7 +684,10 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                     if line_total == "$0.00" and not quantity:
                         print(f"  -> ✗ SKIPPED row (zero amount, no qty): {full_description}")
             else:
-                print(f"  -> ✗ SKIPPED row (insufficient data): desc='{full_description}', price='{unit_price}', qty='{quantity}'")
+                if skip_item:
+                    pass  # Already logged above
+                else:
+                    print(f"  -> ✗ SKIPPED row (insufficient data): desc='{full_description}', price='{unit_price}', qty='{quantity}'")
     
     print(f"Found {line_item_count} line_item entities, created {len(rows)} rows")
     return rows
