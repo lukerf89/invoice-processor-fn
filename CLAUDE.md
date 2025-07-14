@@ -125,11 +125,11 @@ python test_final_creative_coop.py  # Creative-Coop final testing
 ## Required Environment Variables
 
 ```bash
-GOOGLE_CLOUD_PROJECT_ID=your-project-id
-DOCUMENT_AI_PROCESSOR_ID=your-processor-id
+GOOGLE_CLOUD_PROJECT_ID=freckled-hen-analytics
+DOCUMENT_AI_PROCESSOR_ID=be53c6e3a199a473
+GOOGLE_CLOUD_LOCATION=us
 GOOGLE_SHEETS_SPREADSHEET_ID=1PdnZGPZwAV6AHXEeByhOlaEeGObxYWppwLcq0gdvs0E
-GOOGLE_CLOUD_LOCATION=us  # optional, defaults to 'us'
-GOOGLE_SHEETS_SHEET_NAME=Update 20230525  # optional, defaults to 'Sheet1'
+GOOGLE_SHEETS_SHEET_NAME=Update 20230525
 ```
 
 ## Webhook Integration
