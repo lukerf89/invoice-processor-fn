@@ -2,6 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ CRITICAL CODING PRINCIPLE
+
+**NEVER hard-code solutions in main.py. ALWAYS find a logic method that produces the correct output.**
+
+When processing invoices, you may encounter edge cases or specific formatting issues. The correct approach is to:
+- ✅ Use regex patterns and logical rules
+- ✅ Extract information from document text using pattern matching
+- ✅ Create reusable functions that work across different invoices
+- ✅ Implement context-aware processing that adapts to document structure
+
+❌ **DO NOT:** Create if/else statements that check for specific product codes and manually assign values
+❌ **DO NOT:** Hard-code expected outputs for specific items
+❌ **DO NOT:** Use product-specific logic that won't work for other invoices
+
+The goal is maintainable, scalable code that can handle new invoices without modification.
+
 ## Project Overview
 
 This is a Google Cloud Function that processes invoices using Document AI. It receives webhook requests from Zapier (or legacy Trello) with PDF files or URLs, processes invoices, then writes extracted data to Google Sheets.
