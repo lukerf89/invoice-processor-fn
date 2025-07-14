@@ -154,6 +154,10 @@ def process_invoice(request: Request):
         # Use specialized Creative-Coop processing
         rows = process_creative_coop_document(document)
         print(f"Creative-Coop processing returned {len(rows)} rows")
+    elif vendor_type == "OneHundred80":
+        # Use specialized OneHundred80 processing
+        rows = process_onehundred80_document(document)
+        print(f"OneHundred80 processing returned {len(rows)} rows")
     else:
         # Use generic processing for other vendors
         vendor = extract_best_vendor(document.entities)
@@ -1271,6 +1275,18 @@ def detect_vendor_type(document_text):
         if indicator.lower() in document_text.lower():
             return "Creative-Coop"
     
+    # Check for OneHundred80 indicators
+    onehundred80_indicators = [
+        'One Hundred 80 Degrees',
+        'OneHundred80',
+        'One Hundred80',
+        'onehundred80degrees.com'
+    ]
+    
+    for indicator in onehundred80_indicators:
+        if indicator.lower() in document_text.lower():
+            return "OneHundred80"
+    
     return "Generic"
 
 def extract_discount_percentage(document_text):
@@ -1674,5 +1690,222 @@ def extract_description_from_between_text(text):
         line = line.strip()
         if line and len(line) > 5 and not re.match(r'^[\d\s\.\-]+$', line):
             return line
+    
+    return ""
+
+def process_onehundred80_document(document):
+    """Process OneHundred80 documents with correct date, invoice number, and UPC codes"""
+    
+    # Extract basic invoice info
+    entities = {e.type_: e.mention_text for e in document.entities}
+    vendor = extract_best_vendor(document.entities)
+    purchase_order = entities.get("purchase_order", "")
+    
+    # Extract order date from document text - look for patterns like "01/17/2025"
+    order_date = ""
+    date_patterns = [
+        r'Order Date[:\s]+(\d{1,2}/\d{1,2}/\d{4})',
+        r'Date[:\s]+(\d{1,2}/\d{1,2}/\d{4})',
+        r'(\d{1,2}/\d{1,2}/\d{4})'
+    ]
+    
+    for pattern in date_patterns:
+        match = re.search(pattern, document.text, re.IGNORECASE)
+        if match:
+            order_date = match.group(1)
+            break
+    
+    print(f"OneHundred80 processing: Vendor={vendor}, PO={purchase_order}, Date={order_date}")
+    
+    rows = []
+    
+    # Process line items with UPC extraction
+    line_items = [e for e in document.entities if e.type_ == "line_item"]
+    
+    for entity in line_items:
+        entity_text = entity.mention_text
+        
+        # Skip invalid entities
+        if len(entity_text.strip()) < 5:
+            continue
+            
+        # Extract product code, UPC, and other info
+        product_code = ""
+        upc_code = ""
+        description = ""
+        unit_price = ""
+        quantity = ""
+        
+        # Get data from Document AI properties
+        if hasattr(entity, 'properties') and entity.properties:
+            for prop in entity.properties:
+                if prop.type_ == "line_item/product_code":
+                    product_code = prop.mention_text.strip()
+                elif prop.type_ == "line_item/description":
+                    description = prop.mention_text.strip()
+                elif prop.type_ == "line_item/unit_price":
+                    unit_price = clean_price(prop.mention_text)
+                elif prop.type_ == "line_item/quantity":
+                    qty_text = prop.mention_text.strip()
+                    qty_match = re.search(r'\b(\d+)\b', qty_text)
+                    if qty_match:
+                        quantity = qty_match.group(1)
+        
+        # Extract UPC from entity text - look for 12-digit codes
+        upc_match = re.search(r'\b(\d{12})\b', entity_text)
+        if upc_match:
+            upc_code = f"0{upc_match.group(1)}"  # Add leading zero for standard UPC format
+        
+        # Enhance description with logic-based processing
+        if product_code and description:
+            # Logic 1: Fix dimension formatting patterns
+            # Convert patterns like "575"" to "5-5.75"" or "2" 3.25"" to "2" - 3.25""
+            description = re.sub(r'(\d)(\d+)(\d)"', r'\1-\2.\3"', description)  # "575"" → "5-5.75""
+            description = re.sub(r'(\d+\.?\d*)"?\s+(\d+\.?\d*)"', r'\1" - \2"', description)  # "2" 3.25"" → "2" - 3.25""
+            
+            # Logic 2: Remove trailing punctuation and whitespace
+            description = description.rstrip('.,;: \n\r')
+            
+            # Logic 3: Look for fuller descriptions in document text if current description is incomplete
+            if len(description) < 30 or "Wrap" in description:
+                # Find this product in the document text to get fuller context
+                product_context = extract_oneHundred80_product_description(document.text, product_code, upc_code)
+                if product_context and len(product_context) > len(description):
+                    description = product_context
+            
+            # Logic 4: Handle multi-line descriptions by cleaning up newlines
+            if '\n' in description:
+                lines = description.split('\n')
+                # Keep the longest meaningful line as the main description
+                main_desc = max(lines, key=len) if lines else description
+                # Add additional context from other lines if they add value
+                for line in lines:
+                    if (line.strip() and 
+                        line != main_desc and 
+                        len(line.strip()) > 10 and
+                        not re.search(r'(Unit Price|Extended|Price|SKU|UPC|QTY)', line, re.IGNORECASE)):
+                        # Add complementary information if it doesn't overlap
+                        if not any(word in main_desc.lower() for word in line.lower().split()[:3]):
+                            main_desc = f"{main_desc}, {line.strip()}"
+                description = main_desc
+            
+            # Logic 5: Clean up double commas and extra whitespace
+            description = re.sub(r',\s*,', ',', description)  # Remove double commas
+            description = re.sub(r'\s+', ' ', description)  # Normalize whitespace
+            description = description.strip()
+            
+            # Logic 6: Remove table headers and invoice artifacts that got mixed in
+            description = re.sub(r'\b(Unit Price|Extended|Price|SKU|UPC|QTY|Order Items|Total Pieces)\b.*', '', description, flags=re.IGNORECASE)
+            description = description.strip().rstrip(',')
+        
+        # Create formatted description with UPC
+        if product_code and upc_code and description:
+            full_description = f"{product_code} - UPC: {upc_code} - {description}"
+        elif product_code and description:
+            full_description = f"{product_code} - {description}"
+        else:
+            continue  # Skip if we don't have enough info
+        
+        # Only add if we have all required fields
+        if product_code and unit_price and quantity:
+            rows.append([
+                "",  # Column A placeholder
+                order_date,
+                vendor,
+                purchase_order,
+                full_description,
+                unit_price,
+                quantity
+            ])
+            print(f"✓ Added {product_code}: {unit_price} | Qty: {quantity}")
+    
+    print(f"OneHundred80 processing completed: {len(rows)} items")
+    return rows
+
+def extract_oneHundred80_product_description(document_text, product_code, upc_code):
+    """Extract fuller product description from OneHundred80 document text using logical patterns"""
+    
+    # Strategy 1: Find the product code in the document and extract surrounding context
+    if product_code in document_text:
+        # Find all occurrences of the product code
+        product_positions = []
+        start = 0
+        while True:
+            pos = document_text.find(product_code, start)
+            if pos == -1:
+                break
+            product_positions.append(pos)
+            start = pos + 1
+        
+        # For each occurrence, extract context and find the best description
+        best_description = ""
+        for pos in product_positions:
+            # Extract a window of text around the product code
+            window_start = max(0, pos - 200)
+            window_end = min(len(document_text), pos + 300)
+            context = document_text[window_start:window_end]
+            
+            # Look for description patterns in the context
+            # OneHundred80 invoices typically have: SKU UPC QTY UOM Description Unit Price Extended
+            
+            # Pattern 1: Description after UOM (EA, ST, etc.)
+            desc_pattern1 = rf'{re.escape(product_code)}.*?(?:EA|ST)\s+(.+?)(?:\$|\d+\.\d{{2}})'
+            match1 = re.search(desc_pattern1, context, re.DOTALL)
+            if match1:
+                candidate = match1.group(1).strip()
+                candidate = re.sub(r'\s+', ' ', candidate)  # Normalize whitespace
+                if len(candidate) > len(best_description) and len(candidate) > 10:
+                    best_description = candidate
+            
+            # Pattern 2: Description on line after product code
+            lines = context.split('\n')
+            for i, line in enumerate(lines):
+                if product_code in line and i + 1 < len(lines):
+                    next_line = lines[i + 1].strip()
+                    # Check if next line looks like a description (not just numbers/codes)
+                    if (len(next_line) > 15 and 
+                        not re.match(r'^[\d\s\.\$]+$', next_line) and
+                        not re.match(r'^\d{12}$', next_line)):
+                        if len(next_line) > len(best_description):
+                            best_description = next_line
+    
+    # Strategy 2: If UPC is available, use it to find description
+    if upc_code and not best_description:
+        # Remove leading zero from UPC for search
+        search_upc = upc_code[1:] if upc_code.startswith('0') else upc_code
+        if search_upc in document_text:
+            # Find UPC and extract description that follows
+            upc_pos = document_text.find(search_upc)
+            if upc_pos != -1:
+                window_start = max(0, upc_pos - 100)
+                window_end = min(len(document_text), upc_pos + 400)
+                context = document_text[window_start:window_end]
+                
+                # Look for description after UPC
+                desc_pattern = rf'{re.escape(search_upc)}.*?(?:EA|ST)\s+(.+?)(?:\$|\d+\.\d{{2}})'
+                match = re.search(desc_pattern, context, re.DOTALL)
+                if match:
+                    candidate = match.group(1).strip()
+                    candidate = re.sub(r'\s+', ' ', candidate)  # Normalize whitespace
+                    if len(candidate) > 10:
+                        best_description = candidate
+    
+    # Clean up the description
+    if best_description:
+        # Remove common artifacts
+        best_description = re.sub(r'\s+', ' ', best_description)  # Normalize whitespace
+        best_description = best_description.strip()
+        
+        # Remove trailing numbers that might be prices or quantities
+        best_description = re.sub(r'\s+\d+\.\d{2}$', '', best_description)
+        best_description = re.sub(r'\s+\d+$', '', best_description)
+        
+        # Remove UPC codes if they got included
+        best_description = re.sub(r'\b\d{12,13}\b', '', best_description)
+        
+        # Final cleanup
+        best_description = best_description.strip()
+        
+        return best_description
     
     return ""

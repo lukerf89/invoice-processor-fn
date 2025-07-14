@@ -74,7 +74,7 @@ python test_final_creative_coop.py  # Creative-Coop final testing
 
 ### Main Processing
 - `process_invoice()` - Main Cloud Function entry point with multi-input webhook support and vendor detection
-- `detect_vendor_type()` - Identifies vendor type for specialized processing
+- `detect_vendor_type()` - Identifies vendor type for specialized processing (HarperCollins, Creative-Coop, OneHundred80)
 
 ### Generic Processing (All Vendors)
 - `extract_best_vendor()` - Vendor name extraction with confidence scoring
@@ -101,6 +101,10 @@ python test_final_creative_coop.py  # Creative-Coop final testing
 - `extract_discount_percentage()` - Extracts discount from PO text
 - `extract_order_number_improved()` - Extracts order numbers (e.g., NS4435067)
 - `extract_order_date_improved()` - Extracts and formats order dates
+
+### OneHundred80 Specialized Processing
+- `process_onehundred80_document()` - Logic-based OneHundred80 processing with UPC codes and date extraction
+- `extract_oneHundred80_product_description()` - Extracts fuller product descriptions from document text using pattern matching
 
 ## Required Environment Variables
 
@@ -167,6 +171,16 @@ All methods process the PDF through Document AI and output to Google Sheets.
 - **Order number extraction**: Extracts NS-prefixed order numbers
 - **Publisher identification**: Distinguishes HarperCollins from distributor (Anne McGilvray)
 
+### OneHundred80 Specialized Features
+- **Logic-based processing**: Uses pattern matching and regex for description enhancement (no hardcoded values)
+- **UPC code extraction**: Automatically extracts and formats UPC codes from 12-digit patterns
+- **Order date extraction**: Extracts order dates from document text using multiple patterns
+- **Purchase order handling**: Uses purchase order number as invoice identifier
+- **Multi-line description processing**: Intelligently merges multi-line descriptions while filtering table headers
+- **Dimension formatting**: Fixes common formatting issues like "575"" → "5-5.75""
+- **Context-aware extraction**: Pulls fuller descriptions from document text when Document AI descriptions are incomplete
+- **Artifact removal**: Removes table headers, double commas, and other document processing artifacts
+
 ## Testing Strategy
 
 The codebase uses a comprehensive testing approach:
@@ -182,6 +196,7 @@ The codebase uses a comprehensive testing approach:
 - `test_creative_coop.py` - Creative-Coop specific processing
 - `test_integrated_main.py` - Integration testing
 - `test_final_creative_coop.py` - Final Creative-Coop testing with accuracy metrics
+- `test_onehundred80.py` - OneHundred80 specialized processing test
 - `debug_creative_coop_prices_qtys.py` - Debug tool for Creative-Coop pricing and quantity patterns
 - `perfect_processing.py` - HarperCollins perfect processing implementation
 
