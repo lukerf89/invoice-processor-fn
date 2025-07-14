@@ -32,6 +32,14 @@ python document_ai_explorer.py <pdf_file_path> [--save-json]
 
 # Test with local sample invoice
 python document_ai_explorer.py new_invoice.pdf --save-json
+
+# Run specific test scripts
+python test_invoice_processing.py
+python test_creative_coop.py
+python test_integrated_main.py
+
+# Test vendor-specific processing
+python perfect_processing.py  # HarperCollins processing
 ```
 
 ## Architecture
@@ -69,6 +77,13 @@ python document_ai_explorer.py new_invoice.pdf --save-json
 - `extract_shipped_quantity()` - Parses quantity from various formats
 - `extract_specific_invoice_number()` - Handles summary invoices with multiple invoice numbers
 
+### Creative-Coop Specialized Processing
+- `extract_creative_coop_quantity()` - Specialized quantity extraction for Creative-Coop invoices with shipped/back patterns
+- `split_combined_line_item()` - Handles combined Document AI entities with multiple products
+- `extract_upc_from_text()` - Enhanced UPC extraction for combined line items, searches after product codes
+- `clean_item_description()` - Cleans descriptions by removing product codes and UPC codes
+- `extract_description_from_full_text()` - Extracts actual product descriptions from full line text
+
 ### HarperCollins Specialized Processing
 - `process_harpercollins_document()` - Perfect HarperCollins PO processing
 - `get_harpercollins_book_data()` - ISBN/title/price mapping for HarperCollins books
@@ -96,12 +111,37 @@ GOOGLE_SHEETS_SHEET_NAME=Sheet1  # optional, defaults to 'Sheet1'
 - **Date standardization**: Normalizes date formats across invoice types
 - **Vendor extraction**: Uses confidence scoring to identify best vendor match
 
+### Creative-Coop Specialized Features
+- **Combined entity processing**: Handles multiple products in single Document AI entities
+- **Quantity pattern matching**: Extracts quantities from "shipped back unit" patterns (e.g., "8 0 lo each", "6 0 Set")
+- **Split line item support**: Correctly processes combined line items with multiple product codes and UPC codes
+- **Enhanced UPC extraction**: Searches for UPC codes positioned after product codes in document text
+- **Pattern-specific extraction**: Uses context-aware matching for complex quantity patterns
+- **Product-specific handling**: Special logic for known products like DF5599, DF6360, DF6802
+- **Description extraction**: Extracts clean product descriptions from various text patterns
+
 ### HarperCollins Specialized Features
 - **Perfect PO processing**: 100% accurate extraction of all 23 line items
 - **ISBN; Title formatting**: Exact formatting with semicolon separator
 - **50% discount calculation**: Automatic wholesale price calculation
 - **Order number extraction**: Extracts NS-prefixed order numbers
 - **Publisher identification**: Distinguishes HarperCollins from distributor (Anne McGilvray)
+
+## Testing Strategy
+
+The codebase uses a comprehensive testing approach:
+
+- **Test files pattern**: `test_*.py` files for specific functionality testing
+- **Debug files pattern**: `debug_*.py` files for investigating specific issues
+- **Sample data**: Test invoices stored in `test_invoices/` directory with corresponding Document AI outputs
+- **Iterative development**: Multiple `improved_processing*.py` files showing evolution of processing logic
+- **Vendor-specific testing**: Separate test files for different vendor types (Creative-Coop, HarperCollins)
+
+### Key Test Files
+- `test_invoice_processing.py` - Basic invoice processing test
+- `test_creative_coop.py` - Creative-Coop specific processing
+- `test_integrated_main.py` - Integration testing
+- `perfect_processing.py` - HarperCollins perfect processing implementation
 
 ## Deployment
 
@@ -124,3 +164,8 @@ gcloud functions deploy process_invoice \
 - `requirements.txt` - Python dependencies
 - `new_invoice.pdf` - Sample invoice for testing
 - `new_invoice_docai_output.json` - Sample Document AI output for reference
+- `perfect_processing.py` - HarperCollins-specific processing implementation
+- `test_invoices/` - Test invoice files and Document AI outputs
+- `test_*.py` - Various test scripts for specific functionality
+- `debug_*.py` - Debug scripts for specific issues
+- `improved_processing*.py` - Iterative processing improvements
