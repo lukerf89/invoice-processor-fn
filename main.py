@@ -1317,7 +1317,7 @@ def process_harpercollins_document(document):
     return rows
 
 def process_creative_coop_document(document):
-    """Process Creative-Coop documents with wholesale prices and ordered quantities"""
+    """Process Creative-Coop documents with comprehensive wholesale prices and ordered quantities"""
     
     # Extract basic invoice info
     entities = {e.type_: e.mention_text for e in document.entities}
@@ -1330,93 +1330,143 @@ def process_creative_coop_document(document):
     # Get corrected product mappings using algorithmic approach
     correct_mappings = extract_creative_coop_product_mappings_corrected(document.text)
     
-    # Process line items with wholesale prices and ordered quantities
+    # Process ALL products systematically using a comprehensive approach
     rows = []
-    processed_products = set()
+    all_product_data = {}
     
+    # Step 1: Extract all pricing and quantity data for each product
     for entity in document.entities:
         if entity.type_ == "line_item":
             entity_text = entity.mention_text
-            
-            # Find product codes in this entity
             product_codes = re.findall(r'\b(D[A-Z]\d{4}[A-Z]?)\b', entity_text)
             
+            if not product_codes:
+                continue
+                
+            # Extract all numerical values from this entity
+            numbers = re.findall(r'\b\d+(?:\.\d{1,2})?\b', entity_text)
+            
+            # Look for Creative-Coop patterns for each product in this entity
             for product_code in product_codes:
-                if product_code in correct_mappings and product_code not in processed_products:
-                    mapping = correct_mappings[product_code]
+                if product_code not in all_product_data:
+                    all_product_data[product_code] = {
+                        'entity_text': entity_text,
+                        'ordered_qty': '0',
+                        'wholesale_price': '',
+                        'found_in_entity': True
+                    }
+                
+                # Pattern 1: Standard "ordered back unit unit_price wholesale amount" format
+                pattern1 = r'(\d+)\s+(\d+)\s+(?:lo\s+)?(?:each|Set)\s+(\d+\.\d{2})\s+(\d+\.\d{2})\s+(\d+\.\d{2})'
+                matches1 = re.findall(pattern1, entity_text, re.IGNORECASE)
+                
+                for match in matches1:
+                    ordered, back, unit_price, wholesale, amount = match
+                    ordered_int = int(ordered)
                     
-                    # Extract wholesale price and ordered quantity using Creative-Coop pattern
-                    # Pattern: "ordered back unit unit_price wholesale amount"
-                    wholesale_price = ""
-                    ordered_qty = ""
-                    
-                    # Look for Creative-Coop pricing patterns in the entity text
-                    # Pattern 1: "ordered back unit unit_price wholesale amount" (most common)
-                    pattern1 = r'(\d+)\s+(\d+)\s+(?:lo\s+)?(?:each|Set)\s+(\d+\.\d{2})\s+(\d+\.\d{2})\s+(\d+\.\d{2})'
-                    matches1 = re.findall(pattern1, entity_text, re.IGNORECASE)
-                    
-                    # Pattern 2: Look for cases where wholesale appears after the description
-                    # This handles cases like "DF8323A 4 0 each 22.50 ... 18.00 72.00" where 18.00 is wholesale
+                    # Validate this is a reasonable match
+                    if ordered_int >= 0:  # Include 0 quantities
+                        all_product_data[product_code]['ordered_qty'] = ordered
+                        all_product_data[product_code]['wholesale_price'] = f"${wholesale}"
+                        print(f"✓ Pattern 1 for {product_code}: ordered={ordered}, wholesale=${wholesale}")
+                        break
+                
+                # Pattern 2: Handle cases where wholesale appears later in the text
+                if not all_product_data[product_code]['wholesale_price']:
+                    # Look for pattern where we have: qty back unit unit_price ... wholesale amount
                     pattern2 = r'(\d+)\s+(\d+)\s+(?:lo\s+)?(?:each|Set)\s+(\d+\.\d{2}).*?(\d+\.\d{2})\s+(\d+\.\d{2})'
                     matches2 = re.findall(pattern2, entity_text, re.IGNORECASE)
                     
-                    # Try pattern 1 first (most reliable)
-                    for match in matches1:
-                        ordered, back, unit_price, wholesale, amount = match
-                        if int(ordered) > 0:
-                            wholesale_price = f"${wholesale}"
-                            ordered_qty = ordered
-                            print(f"✓ Extracted (Pattern 1) for {product_code}: ordered={ordered}, wholesale=${wholesale}")
+                    for match in matches2:
+                        ordered, back, unit_price, potential_wholesale, amount = match
+                        ordered_int = int(ordered)
+                        
+                        # Validate wholesale price is reasonable (less than unit price)
+                        if ordered_int >= 0 and float(potential_wholesale) <= float(unit_price):
+                            all_product_data[product_code]['ordered_qty'] = ordered
+                            all_product_data[product_code]['wholesale_price'] = f"${potential_wholesale}"
+                            print(f"✓ Pattern 2 for {product_code}: ordered={ordered}, wholesale=${potential_wholesale}")
                             break
-                    
-                    # If pattern 1 didn't work, try pattern 2
-                    if not wholesale_price:
-                        for match in matches2:
-                            ordered, back, unit_price, potential_wholesale, amount = match
-                            if int(ordered) > 0:
-                                # Validate that potential_wholesale is actually a wholesale price
-                                # (should be less than unit_price for wholesale)
-                                if float(potential_wholesale) < float(unit_price):
-                                    wholesale_price = f"${potential_wholesale}"
-                                    ordered_qty = ordered
-                                    print(f"✓ Extracted (Pattern 2) for {product_code}: ordered={ordered}, wholesale=${potential_wholesale}")
-                                    break
-                    
-                    # Fallback: use Document AI price if pattern extraction failed
-                    if not wholesale_price and hasattr(entity, 'properties') and entity.properties:
-                        for prop in entity.properties:
-                            if prop.type_ == "line_item/unit_price":
-                                wholesale_price = clean_price(prop.mention_text)
-                                break
-                    
-                    # Fallback: use Document AI quantity if pattern extraction failed
-                    if not ordered_qty and hasattr(entity, 'properties') and entity.properties:
-                        for prop in entity.properties:
-                            if prop.type_ == "line_item/quantity":
-                                qty_text = prop.mention_text.strip()
-                                qty_match = re.search(r'\b(\d+)\b', qty_text)
-                                if qty_match and int(qty_match.group(1)) > 0:
-                                    ordered_qty = qty_match.group(1)
-                                break
-                    
-                    # Create final description
-                    full_description = f"{product_code} - UPC: {mapping['upc']} - {mapping['description']}"
-                    
-                    # Only add rows with valid pricing and quantity data (ordered > 0)
-                    if wholesale_price and ordered_qty and int(ordered_qty) > 0:
-                        rows.append([
-                            "",  # Column A placeholder
-                            invoice_date,
-                            vendor, 
-                            invoice_number,
-                            full_description,
-                            wholesale_price,
-                            ordered_qty
-                        ])
-                        processed_products.add(product_code)
-                        print(f"✓ Added Creative-Coop item: {product_code} - {mapping['description'][:40]}... | {wholesale_price} | Qty: {ordered_qty}")
+                
+                # Pattern 3: Handle special cases with different ordering
+                if not all_product_data[product_code]['wholesale_price']:
+                    # Some entities might have the format: product_code qty other_qty unit price1 price2 amount
+                    # where we need to determine which price is wholesale
+                    if len(numbers) >= 5:
+                        try:
+                            # Try different combinations to find ordered qty and wholesale price
+                            for i in range(len(numbers) - 4):
+                                potential_ordered = int(float(numbers[i]))
+                                if potential_ordered >= 0:
+                                    # Look for two prices after this
+                                    for j in range(i + 2, min(len(numbers) - 2, i + 6)):
+                                        if '.' in numbers[j] and '.' in numbers[j + 1]:
+                                            price1 = float(numbers[j])
+                                            price2 = float(numbers[j + 1])
+                                            
+                                            # Wholesale should be lower than unit price
+                                            if price2 < price1 and price2 > 0:
+                                                all_product_data[product_code]['ordered_qty'] = str(potential_ordered)
+                                                all_product_data[product_code]['wholesale_price'] = f"${price2:.2f}"
+                                                print(f"✓ Pattern 3 for {product_code}: ordered={potential_ordered}, wholesale=${price2:.2f}")
+                                                break
+                                    if all_product_data[product_code]['wholesale_price']:
+                                        break
+                        except (ValueError, IndexError):
+                            continue
+                
+                # Fallback: Use Document AI properties if available
+                if not all_product_data[product_code]['wholesale_price'] and hasattr(entity, 'properties'):
+                    for prop in entity.properties:
+                        if prop.type_ == "line_item/unit_price":
+                            all_product_data[product_code]['wholesale_price'] = clean_price(prop.mention_text)
+                        elif prop.type_ == "line_item/quantity":
+                            qty_text = prop.mention_text.strip()
+                            qty_match = re.search(r'\b(\d+)\b', qty_text)
+                            if qty_match:
+                                all_product_data[product_code]['ordered_qty'] = qty_match.group(1)
     
-    print(f"Creative-Coop processing completed: {len(rows)} items")
+    # Step 2: Create rows for all products found in mappings
+    print(f"\n=== Creating final output for all products ===")
+    for product_code in sorted(correct_mappings.keys()):
+        mapping = correct_mappings[product_code]
+        
+        # Get product data if we found it
+        product_data = all_product_data.get(product_code, {
+            'ordered_qty': '0',
+            'wholesale_price': '$0.00',
+            'found_in_entity': False
+        })
+        
+        ordered_qty = product_data['ordered_qty']
+        wholesale_price = product_data['wholesale_price']
+        
+        # Ensure we have valid data
+        if not wholesale_price:
+            wholesale_price = '$0.00'
+        
+        if not ordered_qty:
+            ordered_qty = '0'
+        
+        # Create description
+        full_description = f"{product_code} - UPC: {mapping['upc']} - {mapping['description']}"
+        
+        # Only include items with ordered quantity > 0 in final output
+        if int(ordered_qty) > 0:
+            rows.append([
+                "",  # Column A placeholder
+                invoice_date,
+                vendor, 
+                invoice_number,
+                full_description,
+                wholesale_price,
+                ordered_qty
+            ])
+            print(f"✓ Added {product_code}: {wholesale_price} | Qty: {ordered_qty}")
+        else:
+            print(f"- Skipped {product_code}: {wholesale_price} | Qty: {ordered_qty} (zero quantity)")
+    
+    print(f"Creative-Coop processing completed: {len(rows)} items with ordered qty > 0")
     return rows
 
 def extract_creative_coop_product_mappings_corrected(document_text):
