@@ -32,6 +32,10 @@ This is a Google Cloud Function that processes invoices using Document AI. It re
 ## Development Commands
 
 ```bash
+# Setup virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
 # Install dependencies
 pip install -r requirements.txt
 
@@ -58,13 +62,17 @@ python document_ai_explorer.py <pdf_file_path> [--save-json]
 python document_ai_explorer.py new_invoice.pdf --save-json
 
 # Run specific test scripts
-python test_invoice_processing.py
-python test_creative_coop.py
-python test_integrated_main.py
+python test_scripts/test_invoice_processing.py
+python test_scripts/test_creative_coop.py
+python test_scripts/test_integrated_main.py
 
 # Test vendor-specific processing
-python perfect_processing.py  # HarperCollins processing
-python test_final_creative_coop.py  # Creative-Coop final testing
+python test_scripts/perfect_processing.py  # HarperCollins processing
+python test_scripts/test_final_creative_coop.py  # Creative-Coop final testing
+python test_scripts/test_onehundred80.py  # OneHundred80 testing
+
+# Run all vendor-specific tests
+python test_scripts/test_final_creative_coop.py && python test_scripts/perfect_processing.py && python test_scripts/test_onehundred80.py
 ```
 
 ## Architecture
@@ -197,24 +205,54 @@ All methods process the PDF through Document AI and output to Google Sheets.
 - **Context-aware extraction**: Pulls fuller descriptions from document text when Document AI descriptions are incomplete
 - **Artifact removal**: Removes table headers, double commas, and other document processing artifacts
 
+## Development Workflow
+
+The codebase follows an iterative development pattern with extensive testing and debugging:
+
+### File Patterns (in test_scripts/)
+- **`test_*.py`**: Test scripts for specific functionality or vendor processing
+- **`debug_*.py`**: Debug scripts for investigating specific issues with detailed output
+- **`improved_*.py`**: Iterative improvements showing evolution of processing logic
+- **`analyze_*.py`**: Analysis scripts for understanding invoice patterns and data
+- **`validate_*.py`**: Validation scripts for checking processing accuracy
+
+### Development Process
+1. **Analyze**: Use `test_scripts/analyze_*.py` scripts to understand invoice patterns
+2. **Debug**: Use `test_scripts/debug_*.py` scripts to investigate specific processing issues
+3. **Test**: Use `test_scripts/test_*.py` scripts to validate processing logic
+4. **Improve**: Create `test_scripts/improved_*.py` files for iterative enhancements
+5. **Validate**: Use `test_scripts/validate_*.py` scripts to ensure accuracy
+
+### Working with Test Data
+- Test invoices are stored in `test_invoices/` directory
+- Each invoice has a corresponding `*_docai_output.json` file with Document AI results
+- CSV outputs are generated for analysis and validation
+- Use `document_ai_explorer.py` to generate new Document AI outputs for testing
+
+### Local Testing Workflow
+1. **Test with existing sample**: `python test_scripts/test_invoice_processing.py`
+2. **Test new invoice**: `python document_ai_explorer.py path/to/invoice.pdf --save-json`
+3. **Test vendor-specific processing**: Run appropriate `test_scripts/test_*.py` script
+4. **Debug issues**: Use corresponding `test_scripts/debug_*.py` script with detailed output
+5. **Validate accuracy**: Compare results with expected output files
+
 ## Testing Strategy
 
 The codebase uses a comprehensive testing approach:
 
-- **Test files pattern**: `test_*.py` files for specific functionality testing
-- **Debug files pattern**: `debug_*.py` files for investigating specific issues
-- **Sample data**: Test invoices stored in `test_invoices/` directory with corresponding Document AI outputs
-- **Iterative development**: Multiple `improved_processing*.py` files showing evolution of processing logic
-- **Vendor-specific testing**: Separate test files for different vendor types (Creative-Coop, HarperCollins)
-
-### Key Test Files
+### Key Test Files (in test_scripts/)
 - `test_invoice_processing.py` - Basic invoice processing test
 - `test_creative_coop.py` - Creative-Coop specific processing
 - `test_integrated_main.py` - Integration testing
 - `test_final_creative_coop.py` - Final Creative-Coop testing with accuracy metrics
 - `test_onehundred80.py` - OneHundred80 specialized processing test
-- `debug_creative_coop_prices_qtys.py` - Debug tool for Creative-Coop pricing and quantity patterns
 - `perfect_processing.py` - HarperCollins perfect processing implementation
+
+### Debug Files (in test_scripts/)
+- `debug_creative_coop_prices_qtys.py` - Debug tool for Creative-Coop pricing and quantity patterns
+- `debug_quantities.py` - Debug quantity extraction logic
+- `debug_descriptions.py` - Debug description extraction
+- `debug_position_mapping.py` - Debug product position mapping
 
 ## Deployment
 
@@ -235,10 +273,14 @@ gcloud functions deploy process_invoice \
 - `main.py` - Complete Cloud Function implementation
 - `document_ai_explorer.py` - Debug tool for Document AI output analysis
 - `requirements.txt` - Python dependencies
+- `CLAUDE.md` - Project documentation and guidance
 - `new_invoice.pdf` - Sample invoice for testing
 - `new_invoice_docai_output.json` - Sample Document AI output for reference
-- `perfect_processing.py` - HarperCollins-specific processing implementation
 - `test_invoices/` - Test invoice files and Document AI outputs
-- `test_*.py` - Various test scripts for specific functionality
-- `debug_*.py` - Debug scripts for specific issues
-- `improved_processing*.py` - Iterative processing improvements
+- `test_scripts/` - All testing, debugging, and development scripts
+  - `test_*.py` - Various test scripts for specific functionality
+  - `debug_*.py` - Debug scripts for specific issues
+  - `improved_*.py` - Iterative processing improvements
+  - `analyze_*.py` - Analysis scripts for understanding patterns
+  - `validate_*.py` - Validation scripts for accuracy checking
+  - `perfect_processing.py` - HarperCollins-specific processing implementation
