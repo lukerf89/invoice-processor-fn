@@ -121,7 +121,12 @@ The Cloud Function supports three input methods for maximum Zapier compatibility
 3. **JSON**: Legacy support for JSON payload with `file_url` field
 
 ### URL Download Features
-- **Trello authentication**: Special handling for Trello URLs with browser-like headers and session management
+- **Enhanced Trello authentication**: Multi-strategy approach with fallback methods for accessing Trello attachments
+  - Session establishment by visiting Trello card page first
+  - Browser-like headers with Sec-Fetch headers and referrer
+  - URL manipulation fallbacks (removing /download/filename)
+  - Auth header clearing as final fallback
+  - Helpful error messages with suggestions for 401 errors
 - **PDF validation**: Verifies downloaded content is actually a PDF file
 - **Timeout protection**: 30-second timeout to prevent hanging requests
 - **Redirect handling**: Supports automatic redirects for Trello URLs
@@ -132,7 +137,7 @@ All methods process the PDF through Document AI and output to Google Sheets.
 
 ### Universal Features
 - **Multi-input webhook support**: Handles file uploads, form data, and JSON URLs from Zapier
-- **Trello URL authentication**: Special handling for Trello PDFs with browser-like headers and session management
+- **Enhanced Trello authentication**: Multi-strategy fallback system for accessing Trello attachments with comprehensive error handling
 - **Multi-format support**: Single invoices, summary invoices, book invoices
 - **Product code normalization**: Converts long UPC/ISBN codes to short alphanumeric codes
 - **Intelligent price calculation**: Distinguishes wholesale vs retail pricing
