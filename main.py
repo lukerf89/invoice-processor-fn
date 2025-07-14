@@ -63,6 +63,10 @@ def process_invoice(request):
         # Use specialized HarperCollins processing
         rows = process_harpercollins_document(document)
         print(f"HarperCollins processing returned {len(rows)} rows")
+    elif vendor_type == "Creative-Coop":
+        # Use specialized Creative-Coop processing
+        rows = process_creative_coop_document(document)
+        print(f"Creative-Coop processing returned {len(rows)} rows")
     else:
         # Use generic processing for other vendors
         vendor = extract_best_vendor(document.entities)
@@ -1136,6 +1140,18 @@ def detect_vendor_type(document_text):
         if indicator.lower() in document_text.lower():
             return "HarperCollins"
     
+    # Check for Creative-Coop indicators
+    creative_coop_indicators = [
+        'Creative Co-op',
+        'creativeco-op',
+        'Creative Co-Op',
+        'Creative Coop'
+    ]
+    
+    for indicator in creative_coop_indicators:
+        if indicator.lower() in document_text.lower():
+            return "Creative-Coop"
+    
     return "Generic"
 
 def extract_discount_percentage(document_text):
@@ -1267,3 +1283,196 @@ def process_harpercollins_document(document):
             ])
     
     return rows
+
+def process_creative_coop_document(document):
+    """Process Creative-Coop documents with corrected UPC/description mapping"""
+    
+    # Extract basic invoice info
+    entities = {e.type_: e.mention_text for e in document.entities}
+    vendor = extract_best_vendor(document.entities)
+    invoice_number = entities.get("invoice_id", "")
+    invoice_date = format_date(entities.get("invoice_date", ""))
+    
+    print(f"Creative-Coop processing: Vendor={vendor}, Invoice={invoice_number}, Date={invoice_date}")
+    
+    # Get corrected product mappings using algorithmic approach
+    correct_mappings = extract_creative_coop_product_mappings_corrected(document.text)
+    
+    # Process line items with corrected mappings
+    rows = []
+    processed_products = set()
+    
+    for entity in document.entities:
+        if entity.type_ == "line_item":
+            # Extract pricing and quantity
+            unit_price = ""
+            quantity = ""
+            
+            if hasattr(entity, 'properties') and entity.properties:
+                for prop in entity.properties:
+                    if prop.type_ == "line_item/unit_price":
+                        unit_price = clean_price(prop.mention_text)
+                    elif prop.type_ == "line_item/quantity":
+                        qty_text = prop.mention_text.strip()
+                        qty_match = re.search(r'\b(\d+(?:\.\d+)?)\b', qty_text)
+                        if qty_match:
+                            qty_value = float(qty_match.group(1))
+                            if qty_value > 0:  # Only include positive quantities
+                                if qty_value == int(qty_value):
+                                    quantity = str(int(qty_value))
+                                else:
+                                    quantity = str(qty_value)
+            
+            # Find product codes in this entity
+            product_codes = re.findall(r'\b(D[A-Z]\d{4}[A-Z]?)\b', entity.mention_text)
+            
+            for product_code in product_codes:
+                if product_code in correct_mappings and product_code not in processed_products:
+                    mapping = correct_mappings[product_code]
+                    
+                    # Use Creative-Coop specific quantity extraction as fallback
+                    if not quantity:
+                        creative_coop_qty = extract_creative_coop_quantity(document.text, product_code)
+                        if creative_coop_qty is not None:
+                            quantity = creative_coop_qty
+                    
+                    # Create final description
+                    full_description = f"{product_code} - UPC: {mapping['upc']} - {mapping['description']}"
+                    
+                    # Only add rows with valid pricing and quantity data
+                    if unit_price and quantity and quantity != "0":
+                        rows.append([
+                            "",  # Column A placeholder
+                            invoice_date,
+                            vendor, 
+                            invoice_number,
+                            full_description,
+                            unit_price,
+                            quantity
+                        ])
+                        processed_products.add(product_code)
+                        print(f"✓ Added Creative-Coop item: {product_code} - {mapping['description'][:40]}... | {unit_price} | Qty: {quantity}")
+    
+    print(f"Creative-Coop processing completed: {len(rows)} items")
+    return rows
+
+def extract_creative_coop_product_mappings_corrected(document_text):
+    """
+    Extract correct Creative-Coop product mappings by fixing the offset issue
+    
+    The issue: Products are getting UPC/description from the PREVIOUS position
+    The fix: Shift the mapping by +1 to get the correct UPC/description for each product
+    """
+    
+    # Focus on the main invoice table area
+    table_start = document_text.find("Extended | Amount |")
+    if table_start == -1:
+        table_start = 0
+    
+    # Get a substantial portion that includes all products    
+    table_section = document_text[table_start:table_start + 3000]
+    
+    # Find all UPCs and product codes with positions
+    upc_pattern = r'\b(\d{12})\b'
+    product_pattern = r'\b(D[A-Z]\d{4}[A-Z]?)\b'
+    
+    upc_matches = list(re.finditer(upc_pattern, table_section))
+    product_matches = list(re.finditer(product_pattern, table_section))
+    
+    print(f"Creative-Coop mapping: Found {len(upc_matches)} UPCs, {len(product_matches)} products")
+    
+    mappings = {}
+    
+    # The key insight: UPC[i] and Description[i] belong to Product[i], not Product[i+1]
+    # So we need to find the NEXT UPC/description after each product, not the previous one
+    
+    for i, product_match in enumerate(product_matches):
+        product_code = product_match.group(1)
+        product_pos = product_match.start()
+        
+        # For each product, find the NEXT UPC and description that come after it
+        target_upc = None
+        target_description = None
+        
+        # Find the next UPC after this product
+        for upc_match in upc_matches:
+            upc_pos = upc_match.start()
+            if upc_pos > product_pos:  # UPC comes AFTER product
+                target_upc = f"0{upc_match.group(1)}"  # Add leading zero
+                
+                # Find description between this UPC and the next product (if any)
+                next_product_pos = None
+                if i + 1 < len(product_matches):
+                    next_product_pos = product_matches[i + 1].start()
+                else:
+                    next_product_pos = len(table_section)
+                
+                # Extract description between UPC and next product
+                desc_text = table_section[upc_pos + 12:next_product_pos]
+                target_description = extract_description_from_between_text(desc_text)
+                break
+        
+        # Special handling for the first product (DA4315) 
+        # It should get the very first UPC and description in the table
+        if i == 0 and len(upc_matches) > 0:
+            first_upc = f"0{upc_matches[0].group(1)}"
+            first_upc_pos = upc_matches[0].start()
+            
+            # Description between first UPC and first product
+            first_desc_text = table_section[first_upc_pos + 12:product_pos]
+            first_description = extract_description_from_between_text(first_desc_text)
+            
+            if first_description:
+                mappings[product_code] = {
+                    'upc': first_upc,
+                    'description': first_description
+                }
+                print(f"✓ {product_code}: UPC={first_upc}, Desc='{first_description[:50]}{'...' if len(first_description) > 50 else ''}'")
+                continue
+        
+        if target_upc and target_description:
+            mappings[product_code] = {
+                'upc': target_upc,
+                'description': target_description
+            }
+            print(f"✓ {product_code}: UPC={target_upc}, Desc='{target_description[:50]}{'...' if len(target_description) > 50 else ''}'")
+    
+    print(f"Extracted {len(mappings)} Creative-Coop product mappings algorithmically")
+    return mappings
+
+def extract_description_from_between_text(text):
+    """Extract the best description from text between UPC and product code"""
+    
+    # Clean the text
+    text = text.strip()
+    
+    # Split by common delimiters
+    lines = re.split(r'[\n|]+', text)
+    
+    candidates = []
+    for line in lines:
+        line = line.strip()
+        
+        # Good description characteristics:
+        # - Contains quotes (dimensions) or descriptive words
+        # - Not just numbers or table formatting
+        # - Reasonable length
+        if (line and 
+            len(line) > 10 and
+            not re.match(r'^[\d\s\.\-]+$', line) and  # Not just numbers
+            not line.lower() in ['customer', 'item', 'shipped', 'back', 'ordered', 'um', 'list', 'price', 'truck', 'your', 'extended', 'amount'] and
+            ('"' in line or any(word in line.lower() for word in ['cotton', 'stoneware', 'frame', 'pillow', 'glass', 'wood', 'resin']))):
+            
+            candidates.append(line)
+    
+    if candidates:
+        # Return the longest candidate as it's likely the most complete description
+        return max(candidates, key=len)
+    
+    # Fallback: return the first non-empty, non-numeric line
+    for line in lines:
+        line = line.strip()
+        if line and len(line) > 5 and not re.match(r'^[\d\s\.\-]+$', line):
+            return line
+    
+    return ""
