@@ -127,9 +127,9 @@ python test_final_creative_coop.py  # Creative-Coop final testing
 ```bash
 GOOGLE_CLOUD_PROJECT_ID=your-project-id
 DOCUMENT_AI_PROCESSOR_ID=your-processor-id
-GOOGLE_SHEETS_SPREADSHEET_ID=your-spreadsheet-id
+GOOGLE_SHEETS_SPREADSHEET_ID=1PdnZGPZwAV6AHXEeByhOlaEeGObxYWppwLcq0gdvs0E
 GOOGLE_CLOUD_LOCATION=us  # optional, defaults to 'us'
-GOOGLE_SHEETS_SHEET_NAME=Sheet1  # optional, defaults to 'Sheet1'
+GOOGLE_SHEETS_SHEET_NAME=Update 20230525  # optional, defaults to 'Sheet1'
 ```
 
 ## Webhook Integration
