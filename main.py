@@ -200,7 +200,7 @@ def process_invoice(request: Request):
         
         result = sheet.values().append(
             spreadsheetId=spreadsheet_id,
-            range=f"{sheet_name}!A:G",
+            range=f"'{sheet_name}'!A:G",
             valueInputOption="USER_ENTERED",
             insertDataOption="INSERT_ROWS",
             body={"values": rows}
@@ -564,13 +564,36 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
             # Store the full line item text for advanced parsing
             full_line_text = entity.mention_text.strip()
             
-            # Check if this line item contains multiple products (Creative-Coop style)
-            # Look for multiple DF/DA product codes in the same line
-            product_codes = re.findall(r'\b(D[A-Z]\d{4}[A-Z]?)\b', full_line_text)
-            if len(product_codes) > 1:
-                print(f"  -> Found multiple product codes: {product_codes}")
+            # Check if this line item contains multiple products
+            # Creative-Coop style: Look for multiple DF/DA product codes
+            creative_coop_codes = re.findall(r'\b(D[A-Z]\d{4}[A-Z]?)\b', full_line_text)
+            # Rifle Paper style: Look for multiple alphanumeric product codes with prices
+            rifle_paper_codes = re.findall(r'\b([A-Z0-9]{3,10})\s+\d{12}\s+\$?\d+\.\d{2}', full_line_text)
+            
+            if len(creative_coop_codes) > 1:
+                print(f"  -> Found multiple Creative-Coop product codes: {creative_coop_codes}")
                 # Split this into multiple line items
                 split_items = split_combined_line_item(full_line_text, entity, document.text)
+                for split_item in split_items:
+                    if (split_item and 
+                        len(split_item.get('description', '')) > 5 and 
+                        split_item.get('unit_price') and 
+                        split_item['unit_price'] != "$0.00"):  # Must have valid price
+                        rows.append([
+                            "",  # Column A placeholder
+                            invoice_date,
+                            vendor, 
+                            invoice_number,
+                            split_item['description'],
+                            split_item['unit_price'],
+                            split_item.get('quantity', '')
+                        ])
+                        print(f"  -> ✓ ADDED split item: {split_item['description']}, {split_item['unit_price']}, Qty: {split_item.get('quantity', '')}")
+                continue  # Skip the normal processing for this combined item
+            elif len(rifle_paper_codes) > 1 or (vendor and 'rifle' in vendor.lower() and len(rifle_paper_codes) >= 1 and '\n' in full_line_text):
+                print(f"  -> Found Rifle Paper style combined line item")
+                # Split this into multiple line items
+                split_items = split_rifle_paper_line_item(full_line_text, entity, document.text)
                 for split_item in split_items:
                     if (split_item and 
                         len(split_item.get('description', '')) > 5 and 
@@ -1076,6 +1099,117 @@ def extract_description_from_full_text(full_text, product_code, upc_code):
     
     # Fallback: try to clean what we have
     return clean_item_description(full_text, product_code, upc_code)
+
+def split_rifle_paper_line_item(full_line_text, entity, document_text=None):
+    """Split combined line items that contain multiple products (Rifle Paper style)"""
+    items = []
+    
+    # Rifle Paper format: Multiple descriptions followed by multiple product code/UPC/price/qty lines
+    # Example: "Desc1\nDesc2\nDesc3 CODE1 UPC1 7.00 4 28.00 CODE2 UPC2 24.00 4 96.00 CODE3 UPC3 9.50 4 38.00"
+    
+    # Split by newlines to separate descriptions from data
+    lines = full_line_text.split('\n')
+    
+    # Find the line with product codes, UPCs, and prices
+    data_line = ""
+    descriptions = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Check if this line contains product codes with UPCs and prices
+        # Pattern: CODE UPC PRICE QTY TOTAL (repeated)
+        if re.search(r'\b[A-Z0-9]{3,10}\s+\d{12}\s+\d+\.\d{2}', line):
+            data_line = line
+        else:
+            # This is likely a description line
+            descriptions.append(line)
+    
+    if not data_line:
+        return items
+    
+    # Extract product patterns: CODE UPC PRICE QTY TOTAL
+    # Pattern matches: NPU001 842967188700 7.00 4 28.00
+    product_pattern = r'\b([A-Z0-9]{3,10})\s+(\d{12})\s+(\d+\.\d{2})\s+(\d+)\s+(\d+\.\d{2})'
+    matches = re.findall(product_pattern, data_line)
+    
+    print(f"  -> Found {len(matches)} product patterns in data line")
+    print(f"  -> Descriptions: {descriptions}")
+    
+    # Create items for each product found
+    for i, (code, upc, price, qty, total) in enumerate(matches):
+        # Try to match description to product code
+        description = ""
+        
+        # Look for description that contains this product code
+        for desc in descriptions:
+            if f"#{code}" in desc or code in desc:
+                description = desc
+                break
+        
+        # If no specific description found, try to match by position/order
+        if not description and descriptions:
+            # For the missing description, look in the entity's full description list
+            # or check if there are more descriptions available than what we parsed
+            if i < len(descriptions):
+                description = descriptions[i]
+            else:
+                # Try to find more descriptions by looking at the full text
+                # Look for descriptions that weren't captured in our initial parsing
+                remaining_text = full_line_text
+                # Try to find pattern like "| default - #CODE"
+                code_desc_pattern = rf'([^|]+)\|\s*default\s*-\s*#{code}'
+                match = re.search(code_desc_pattern, remaining_text)
+                if match:
+                    description = f"{match.group(1).strip()} | default - #{code}"
+                else:
+                    # Look for the pattern where descriptions are separated by newlines
+                    # and might be in different positions
+                    all_lines = full_line_text.split('\n')
+                    desc_lines = [line.strip() for line in all_lines if '|' in line and 'default' in line and not re.search(r'\d{12}', line)]
+                    if len(desc_lines) > i:
+                        description = desc_lines[i]
+                    elif desc_lines:
+                        # Fallback: try to find any unused description
+                        for desc_line in desc_lines:
+                            # Check if this description hasn't been used yet
+                            desc_code = re.search(r'#([A-Z0-9]+)', desc_line)
+                            if desc_code and desc_code.group(1) == code:
+                                description = desc_line
+                                break
+                    
+                # Last resort fallback
+                if not description and descriptions:
+                    description = descriptions[0]
+        
+        # Clean up description
+        if description:
+            # Remove product code references to avoid duplication
+            clean_desc = re.sub(rf'\s*-\s*#{code}\s*$', '', description)
+            clean_desc = re.sub(rf'\s*#{code}\s*', '', clean_desc)
+            clean_desc = clean_desc.strip()
+            
+            full_description = f"{code} - {clean_desc}"
+        else:
+            full_description = code
+        
+        # Format price with dollar sign
+        formatted_price = f"${price}"
+        
+        items.append({
+            'product_code': code,
+            'description': full_description,
+            'unit_price': formatted_price,
+            'quantity': qty,
+            'upc_code': upc,
+            'line_total': f"${total}"
+        })
+        
+        print(f"  -> Created item: {code} - {description}, ${price}, Qty: {qty}")
+    
+    return items
 
 def split_combined_line_item(full_line_text, entity, document_text=None):
     """Split combined line items that contain multiple products (Creative-Coop style)"""

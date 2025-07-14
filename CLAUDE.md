@@ -236,6 +236,49 @@ The codebase follows an iterative development pattern with extensive testing and
 4. **Debug issues**: Use corresponding `test_scripts/debug_*.py` script with detailed output
 5. **Validate accuracy**: Compare results with expected output files
 
+### Complete Invoice Testing Workflow
+
+#### **Quick Shortcut (Recommended)**
+Use the automated testing script for any invoice:
+```bash
+# One-command testing workflow
+python test_invoice.py InvoiceName
+
+# Example
+python test_invoice.py Rifle_Paper_INV_J7XM9XQ3HB
+```
+
+This automatically:
+1. Generates JSON from PDF using Document AI
+2. Processes JSON through main.py functions
+3. Saves CSV output with extracted line items
+4. Provides detailed processing summary
+
+#### **Manual Step-by-Step Process**
+For testing new invoices manually, follow this standardized process:
+
+1. **Export PDF to JSON**: 
+   ```bash
+   export GOOGLE_CLOUD_PROJECT_ID="freckled-hen-analytics"
+   export DOCUMENT_AI_PROCESSOR_ID="be53c6e3a199a473"
+   export GOOGLE_CLOUD_LOCATION="us"
+   python document_ai_explorer.py test_invoices/InvoiceName.pdf --save-json
+   ```
+   This creates: `test_invoices/InvoiceName_docai_output.json`
+
+2. **Process JSON to CSV**:
+   Create a test script in `test_scripts/` or use existing processing functions:
+   ```python
+   # Load JSON, process through main.py functions, save as CSV
+   # Example: test_scripts/test_rifle_paper_processing.py
+   ```
+   This creates: `test_invoices/InvoiceName_processed_output.csv`
+
+3. **Verify Results**:
+   - Check extracted line items match PDF content
+   - Verify product codes, descriptions, quantities, and prices
+   - Confirm vendor detection and invoice information
+
 ## Testing Strategy
 
 The codebase uses a comprehensive testing approach:
@@ -272,6 +315,8 @@ gcloud functions deploy process_invoice \
 
 - `main.py` - Complete Cloud Function implementation
 - `document_ai_explorer.py` - Debug tool for Document AI output analysis
+- `test_invoice.py` - **Automated testing workflow shortcut script**
+- `test_invoice.sh` - Bash version of automated testing workflow
 - `requirements.txt` - Python dependencies
 - `CLAUDE.md` - Project documentation and guidance
 - `new_invoice.pdf` - Sample invoice for testing
