@@ -6,25 +6,48 @@ from datetime import datetime
 from google.cloud import documentai_v1 as documentai
 from googleapiclient.discovery import build
 from google.auth import default
-from flask import jsonify
+from flask import jsonify, Request
 
 @functions_framework.http
-def process_invoice(request):
-    request_json = request.get_json(silent=True)
-    
-    # Step 1: Extract PDF URL from Trello webhook
-    file_url = request_json.get('file_url') if request_json else None
-    if not file_url:
-        return jsonify({"error": "Missing file_url"}), 400
+def process_invoice(request: Request):
+    # Check request method
+    if request.method != 'POST':
+        return jsonify({"error": "Method Not Allowed"}), 405
 
-    # Step 2: Download the PDF from Trello
-    try:
-        response = requests.get(file_url)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": f"Failed to download PDF: {str(e)}"}), 500
+    # Step 1: Handle file upload from Zapier form POST
+    if request.files and 'invoice_file' in request.files:
+        # New Zapier form upload method
+        file = request.files['invoice_file']
+        filename = file.filename
+        
+        if not filename:
+            return jsonify({"error": "No filename provided"}), 400
+        
+        # Read file content directly from memory
+        pdf_content = file.read()
+        
+        if not pdf_content:
+            return jsonify({"error": "Empty file received"}), 400
+            
+        print(f"Received file upload: {filename}")
+        
+    else:
+        # Fallback to old JSON file URL method for backward compatibility
+        request_json = request.get_json(silent=True)
+        
+        file_url = request_json.get('file_url') if request_json else None
+        if not file_url:
+            return jsonify({"error": "Missing invoice_file or file_url"}), 400
 
-    pdf_content = response.content
+        # Step 2: Download the PDF from URL
+        try:
+            response = requests.get(file_url)
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            return jsonify({"error": f"Failed to download PDF: {str(e)}"}), 500
+
+        pdf_content = response.content
+        print(f"Downloaded PDF from URL: {file_url}")
 
     # Step 3: Get configuration from environment variables
     project_id = os.environ.get('GOOGLE_CLOUD_PROJECT_ID')
