@@ -185,6 +185,19 @@ def process_invoice(request: Request):
         # Fallback to generic processing if specialized processing returns no results
         if not rows:
             print("Creative-Coop specialized processing found no items, falling back to generic processing...")
+            
+            # Re-extract invoice details for fallback processing
+            import re
+            cs_matches = re.findall(r'CS(\d+)', document.text)
+            if cs_matches:
+                invoice_number = f"CS{cs_matches[0]}"
+            
+            date_matches = re.findall(r'ORDER DATE:\s*(\d{1,2}/\d{1,2}/\d{4})', document.text)
+            if date_matches:
+                invoice_date = date_matches[0]
+            
+            print(f"Using fallback details: Invoice={invoice_number}, Date={invoice_date}")
+            
             rows = extract_line_items_from_entities(document, invoice_date, vendor, invoice_number)
             print(f"Generic entity extraction returned {len(rows)} rows")
             
