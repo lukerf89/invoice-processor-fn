@@ -162,7 +162,7 @@ def process_invoice(request: Request):
         # Use specialized Creative-Coop processing
         rows = process_creative_coop_document(document)
         vendor = "Creative-Coop"
-        invoice_number = entities.get("invoice_id") or extract_specific_invoice_number(document.text) or "Unknown"
+        invoice_number = entities.get("invoice_id") or "Unknown"
         invoice_date = format_date(entities.get("invoice_date")) or extract_order_date(document.text) or "Unknown"
         print(f"Creative-Coop processing returned {len(rows)} rows")
     elif vendor_type == "OneHundred80":
