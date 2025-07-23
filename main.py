@@ -142,6 +142,11 @@ def process_invoice(request: Request):
     # Debug: Log all detected entities
     print(f"Document AI detected entities: {entities}")
     
+    # Initialize variables that will be used in response
+    vendor = ""
+    invoice_number = ""
+    invoice_date = ""
+    
     # Detect vendor type and use appropriate processing
     vendor_type = detect_vendor_type(document.text)
     print(f"Detected vendor type: {vendor_type}")
@@ -149,14 +154,24 @@ def process_invoice(request: Request):
     if vendor_type == "HarperCollins":
         # Use specialized HarperCollins processing
         rows = process_harpercollins_document(document)
+        vendor = "HarperCollins"
+        invoice_number = extract_order_number_improved(document.text) or "Unknown"
+        invoice_date = extract_order_date_improved(document.text) or "Unknown"
         print(f"HarperCollins processing returned {len(rows)} rows")
     elif vendor_type == "Creative-Coop":
         # Use specialized Creative-Coop processing
         rows = process_creative_coop_document(document)
+        vendor = "Creative-Coop"
+        invoice_number = entities.get("invoice_id") or extract_specific_invoice_number(document.text) or "Unknown"
+        invoice_date = format_date(entities.get("invoice_date")) or extract_order_date(document.text) or "Unknown"
         print(f"Creative-Coop processing returned {len(rows)} rows")
     elif vendor_type == "OneHundred80":
         # Use specialized OneHundred80 processing
         rows = process_onehundred80_document(document)
+        vendor = "OneHundred80"
+        # OneHundred80 uses purchase order number as invoice number
+        invoice_number = extract_order_number(document.text) or "Unknown"
+        invoice_date = extract_order_date(document.text) or "Unknown"
         print(f"OneHundred80 processing returned {len(rows)} rows")
     else:
         # Use generic processing for other vendors
