@@ -158,6 +158,22 @@ def process_invoice(request: Request):
         invoice_number = extract_order_number_improved(document.text) or "Unknown"
         invoice_date = extract_order_date_improved(document.text) or "Unknown"
         print(f"HarperCollins processing returned {len(rows)} rows")
+        
+        # Fallback to generic processing if specialized processing returns no results
+        if not rows:
+            print("HarperCollins specialized processing found no items, falling back to generic processing...")
+            rows = extract_line_items_from_entities(document, invoice_date, vendor, invoice_number)
+            print(f"Generic entity extraction returned {len(rows)} rows")
+            
+            if not rows:
+                print("Falling back to table extraction...")
+                rows = extract_line_items(document, invoice_date, vendor, invoice_number)
+                print(f"Table extraction returned {len(rows)} rows")
+            
+            if not rows:
+                print("Falling back to text extraction...")
+                rows = extract_line_items_from_text(document.text, invoice_date, vendor, invoice_number)
+                print(f"Text extraction returned {len(rows)} rows")
     elif vendor_type == "Creative-Coop":
         # Use specialized Creative-Coop processing
         rows = process_creative_coop_document(document)
@@ -165,6 +181,22 @@ def process_invoice(request: Request):
         invoice_number = entities.get("invoice_id") or "Unknown"
         invoice_date = format_date(entities.get("invoice_date")) or extract_order_date(document.text) or "Unknown"
         print(f"Creative-Coop processing returned {len(rows)} rows")
+        
+        # Fallback to generic processing if specialized processing returns no results
+        if not rows:
+            print("Creative-Coop specialized processing found no items, falling back to generic processing...")
+            rows = extract_line_items_from_entities(document, invoice_date, vendor, invoice_number)
+            print(f"Generic entity extraction returned {len(rows)} rows")
+            
+            if not rows:
+                print("Falling back to table extraction...")
+                rows = extract_line_items(document, invoice_date, vendor, invoice_number)
+                print(f"Table extraction returned {len(rows)} rows")
+            
+            if not rows:
+                print("Falling back to text extraction...")
+                rows = extract_line_items_from_text(document.text, invoice_date, vendor, invoice_number)
+                print(f"Text extraction returned {len(rows)} rows")
     elif vendor_type == "OneHundred80":
         # Use specialized OneHundred80 processing
         rows = process_onehundred80_document(document)
@@ -173,6 +205,22 @@ def process_invoice(request: Request):
         invoice_number = extract_order_number(document.text) or "Unknown"
         invoice_date = extract_order_date(document.text) or "Unknown"
         print(f"OneHundred80 processing returned {len(rows)} rows")
+        
+        # Fallback to generic processing if specialized processing returns no results
+        if not rows:
+            print("OneHundred80 specialized processing found no items, falling back to generic processing...")
+            rows = extract_line_items_from_entities(document, invoice_date, vendor, invoice_number)
+            print(f"Generic entity extraction returned {len(rows)} rows")
+            
+            if not rows:
+                print("Falling back to table extraction...")
+                rows = extract_line_items(document, invoice_date, vendor, invoice_number)
+                print(f"Table extraction returned {len(rows)} rows")
+            
+            if not rows:
+                print("Falling back to text extraction...")
+                rows = extract_line_items_from_text(document.text, invoice_date, vendor, invoice_number)
+                print(f"Text extraction returned {len(rows)} rows")
     else:
         # Use generic processing for other vendors
         vendor = extract_best_vendor(document.entities)
