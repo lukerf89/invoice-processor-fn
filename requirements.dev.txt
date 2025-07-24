@@ -1,0 +1,7 @@
+-r requirements.txt
+black
+isort
+pytest
+pytest-watch
+pytest-mock
+pre-commit

@@ -72,41 +72,41 @@ def process_invoice():
     invoice_name = "$INVOICE_NAME"
     json_file = "$JSON_FILE"
     csv_file = "$CSV_FILE"
-    
+
     print(f"Processing: {json_file}")
-    
+
     with open(json_file, 'r') as f:
         doc_dict = json.load(f)
-    
+
     # Convert back to Document AI format
     from google.cloud import documentai_v1 as documentai
     document = documentai.Document(doc_dict)
-    
+
     # Extract key information
     entities = {e.type_: e.mention_text for e in document.entities}
-    
+
     # Extract basic invoice information
     vendor = entities.get('supplier_name', 'Unknown Vendor')
     invoice_date = format_date(entities.get('invoice_date', ''))
     if not invoice_date:
         invoice_date = datetime.now().strftime("%m/%d/%Y")
-    
+
     # Try to extract invoice number from filename or text
     invoice_number = invoice_name.split('_')[-1] if '_' in invoice_name else invoice_name
-    
+
     print(f"Vendor: {vendor}")
     print(f"Invoice Date: {invoice_date}")
     print(f"Invoice Number: {invoice_number}")
-    
+
     # Extract line items using the main processing functions
     rows = extract_line_items_from_entities(document, invoice_date, vendor, invoice_number)
     if not rows:
         rows = extract_line_items(document, invoice_date, vendor, invoice_number)
     if not rows:
         rows = extract_line_items_from_text(document.text, invoice_date, vendor, invoice_number)
-    
+
     print(f"\\nExtracted {len(rows)} line items")
-    
+
     # Save to CSV file
     if rows:
         with open(csv_file, 'w', newline='', encoding='utf-8') as f:
@@ -115,7 +115,7 @@ def process_invoice():
             writer.writerow(['Date', 'Vendor', 'Invoice Number', 'Product Code', 'Description', 'Quantity', 'Price'])
             # Write data rows
             writer.writerows(rows)
-        
+
         print(f"✅ CSV output saved to: {csv_file}")
         return len(rows)
     else:
