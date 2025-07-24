@@ -8,7 +8,6 @@ all available extracted information in a structured format.
 
 import json
 import os
-from typing import Optional
 
 from google.cloud import documentai
 
