@@ -257,7 +257,7 @@ This automatically:
 #### **Manual Step-by-Step Process**
 For testing new invoices manually, follow this standardized process:
 
-1. **Export PDF to JSON**: 
+1. **Export PDF to JSON**:
    ```bash
    export GOOGLE_CLOUD_PROJECT_ID="freckled-hen-analytics"
    export DOCUMENT_AI_PROCESSOR_ID="be53c6e3a199a473"

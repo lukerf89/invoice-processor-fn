@@ -1,0 +1,8 @@
+-r requirements.txt
+black
+conventional-commits-check
+isort
+pre-commit
+pytest
+pytest-watch
+pytest-mock
