@@ -14,17 +14,17 @@ from googleapiclient.discovery import build
 
 def process_with_gemini_first(pdf_content):
     """Try Gemini AI first for invoice processing"""
-    
+
     try:
         # Configure Gemini
-        api_key = os.environ.get('GEMINI_API_KEY')
+        api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             print("⚠️ GEMINI_API_KEY not found, skipping Gemini processing")
             return None
-            
+
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-pro')
-        
+        model = genai.GenerativeModel("gemini-1.5-pro")
+
         # Luke's exact prompt for invoice parsing
         prompt = """You are an invoice parser. Your job is to extract product information from this invoice that will go into a Google Sheet.
 
@@ -64,63 +64,61 @@ IMPORTANT RULES:
 Extract from this invoice:"""
 
         print("🤖 Attempting Gemini AI processing...")
-        
+
         # Send PDF to Gemini
-        response = model.generate_content([
-            prompt,
-            {
-                "mime_type": "application/pdf",
-                "data": pdf_content
-            }
-        ])
-        
+        response = model.generate_content(
+            [prompt, {"mime_type": "application/pdf", "data": pdf_content}]
+        )
+
         # Parse response
         result_text = response.text.strip()
-        
+
         # Clean JSON response
-        result_text = result_text.replace('```json', '').replace('```', '').strip()
-        
+        result_text = result_text.replace("```json", "").replace("```", "").strip()
+
         # Remove any markdown formatting
-        if result_text.startswith('```'):
-            result_text = result_text.split('\n', 1)[1]
-        if result_text.endswith('```'):
-            result_text = result_text.rsplit('\n', 1)[0]
-        
+        if result_text.startswith("```"):
+            result_text = result_text.split("\n", 1)[1]
+        if result_text.endswith("```"):
+            result_text = result_text.rsplit("\n", 1)[0]
+
         print(f"🔍 Gemini raw response (first 200 chars): {result_text[:200]}...")
-        
+
         # Parse JSON
         gemini_result = json.loads(result_text)
-        
+
         # Validate response structure
         if not isinstance(gemini_result, dict):
             print("❌ Gemini response is not a JSON object")
             return None
-            
-        line_items = gemini_result.get('line_items', [])
+
+        line_items = gemini_result.get("line_items", [])
         if not line_items or len(line_items) == 0:
             print("⚠️ Gemini found no line items")
             return None
-        
+
         # Convert to existing row format
         rows = []
-        order_date = gemini_result.get('order_date', '')
-        vendor = gemini_result.get('vendor', '')
-        invoice_number = gemini_result.get('invoice_number', '')
-        
+        order_date = gemini_result.get("order_date", "")
+        vendor = gemini_result.get("vendor", "")
+        invoice_number = gemini_result.get("invoice_number", "")
+
         for item in line_items:
-            rows.append([
-                "",  # Column A placeholder
-                order_date,
-                vendor, 
-                invoice_number,
-                item.get('item', ''),
-                item.get('wholesale', ''),
-                item.get('qty_ordered', '')
-            ])
-        
+            rows.append(
+                [
+                    "",  # Column A placeholder
+                    order_date,
+                    vendor,
+                    invoice_number,
+                    item.get("item", ""),
+                    item.get("wholesale", ""),
+                    item.get("qty_ordered", ""),
+                ]
+            )
+
         print(f"✅ Gemini successfully extracted {len(rows)} line items")
         return rows, order_date, vendor, invoice_number
-            
+
     except json.JSONDecodeError as e:
         print(f"❌ Gemini JSON parsing failed: {e}")
         print(f"📄 Raw response: {result_text}")
@@ -159,14 +157,14 @@ def process_invoice(request: Request):
 
         if gemini_result:
             rows, invoice_date, vendor, invoice_number = gemini_result
-            
+
             print(f"✅ Gemini processing successful: {len(rows)} items")
-            
+
             # Write to Google Sheets
             try:
                 spreadsheet_id = os.environ.get("GOOGLE_SHEETS_SPREADSHEET_ID")
                 sheet_name = os.environ.get("GOOGLE_SHEETS_SHEET_NAME", "Sheet1")
-                
+
                 credentials, _ = default()
                 service = build("sheets", "v4", credentials=credentials)
                 sheet = service.spreadsheets()
@@ -183,26 +181,35 @@ def process_invoice(request: Request):
                     .execute()
                 )
 
-                return jsonify({
-                    "success": True,
-                    "message": f"✅ Gemini AI processed {len(rows)} items successfully",
-                    "method": "gemini",
-                    "vendor": vendor,
-                    "invoice_number": invoice_number,
-                    "invoice_date": invoice_date,
-                    "items_count": len(rows),
-                    "spreadsheet_updated": True,
-                    "updated_range": result.get("updates", {}).get("updatedRange", ""),
-                })
-                
+                return jsonify(
+                    {
+                        "success": True,
+                        "message": f"✅ Gemini AI processed {len(rows)} items successfully",
+                        "method": "gemini",
+                        "vendor": vendor,
+                        "invoice_number": invoice_number,
+                        "invoice_date": invoice_date,
+                        "items_count": len(rows),
+                        "spreadsheet_updated": True,
+                        "updated_range": result.get("updates", {}).get(
+                            "updatedRange", ""
+                        ),
+                    }
+                )
+
             except Exception as e:
-                return jsonify({
-                    "success": False, 
-                    "error": f"Gemini extraction succeeded but Sheets write failed: {str(e)}",
-                    "method": "gemini",
-                    "items_extracted": len(rows)
-                }), 500
-        
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": f"Gemini extraction succeeded but Sheets write failed: {str(e)}",
+                            "method": "gemini",
+                            "items_extracted": len(rows),
+                        }
+                    ),
+                    500,
+                )
+
         print("⚠️ Gemini processing failed, falling back to Document AI...")
 
     else:
@@ -299,14 +306,14 @@ def process_invoice(request: Request):
 
     if gemini_result:
         rows, invoice_date, vendor, invoice_number = gemini_result
-        
+
         print(f"✅ Gemini processing successful: {len(rows)} items")
-        
+
         # Write to Google Sheets
         try:
             spreadsheet_id = os.environ.get("GOOGLE_SHEETS_SPREADSHEET_ID")
             sheet_name = os.environ.get("GOOGLE_SHEETS_SHEET_NAME", "Sheet1")
-            
+
             credentials, _ = default()
             service = build("sheets", "v4", credentials=credentials)
             sheet = service.spreadsheets()
@@ -323,26 +330,33 @@ def process_invoice(request: Request):
                 .execute()
             )
 
-            return jsonify({
-                "success": True,
-                "message": f"✅ Gemini AI processed {len(rows)} items successfully",
-                "method": "gemini",
-                "vendor": vendor,
-                "invoice_number": invoice_number,
-                "invoice_date": invoice_date,
-                "items_count": len(rows),
-                "spreadsheet_updated": True,
-                "updated_range": result.get("updates", {}).get("updatedRange", ""),
-            })
-            
+            return jsonify(
+                {
+                    "success": True,
+                    "message": f"✅ Gemini AI processed {len(rows)} items successfully",
+                    "method": "gemini",
+                    "vendor": vendor,
+                    "invoice_number": invoice_number,
+                    "invoice_date": invoice_date,
+                    "items_count": len(rows),
+                    "spreadsheet_updated": True,
+                    "updated_range": result.get("updates", {}).get("updatedRange", ""),
+                }
+            )
+
         except Exception as e:
-            return jsonify({
-                "success": False, 
-                "error": f"Gemini extraction succeeded but Sheets write failed: {str(e)}",
-                "method": "gemini",
-                "items_extracted": len(rows)
-            }), 500
-    
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": f"Gemini extraction succeeded but Sheets write failed: {str(e)}",
+                        "method": "gemini",
+                        "items_extracted": len(rows),
+                    }
+                ),
+                500,
+            )
+
     print("⚠️ Gemini processing failed, falling back to Document AI...")
 
     # Step 3: Get configuration from environment variables
