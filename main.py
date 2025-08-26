@@ -14,7 +14,9 @@ from googleapiclient.discovery import build
 
 def process_with_gemini_first(pdf_content):
     """Try Gemini AI first for invoice processing"""
-
+    
+    import time
+    
     try:
         # Configure Gemini
         api_key = os.environ.get("GEMINI_API_KEY")
@@ -65,10 +67,23 @@ Extract from this invoice:"""
 
         print("🤖 Attempting Gemini AI processing...")
 
-        # Send PDF to Gemini
-        response = model.generate_content(
-            [prompt, {"mime_type": "application/pdf", "data": pdf_content}]
-        )
+        # Send PDF to Gemini with timeout to prevent Zapier timeouts
+        start_time = time.time()
+        
+        try:
+            # Set a 90-second timeout to ensure we have time for fallback processing
+            response = model.generate_content(
+                [prompt, {"mime_type": "application/pdf", "data": pdf_content}],
+                request_options={"timeout": 90}
+            )
+            
+            processing_time = time.time() - start_time
+            print(f"🕐 Gemini processing took {processing_time:.1f} seconds")
+            
+        except Exception as timeout_error:
+            processing_time = time.time() - start_time
+            print(f"⏰ Gemini timeout after {processing_time:.1f} seconds: {timeout_error}")
+            return None
 
         # Parse response
         result_text = response.text.strip()
