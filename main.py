@@ -1,13 +1,133 @@
+import json
 import os
 import re
 from datetime import datetime
 
 import functions_framework
+import google.generativeai as genai
 import requests
 from flask import Request, jsonify
 from google.auth import default
 from google.cloud import documentai_v1 as documentai
 from googleapiclient.discovery import build
+
+
+def process_with_gemini_first(pdf_content):
+    """Try Gemini AI first for invoice processing"""
+    
+    try:
+        # Configure Gemini
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if not api_key:
+            print("⚠️ GEMINI_API_KEY not found, skipping Gemini processing")
+            return None
+            
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-pro')
+        
+        # Luke's exact prompt for invoice parsing
+        prompt = """You are an invoice parser. Your job is to extract product information from this invoice that will go into a Google Sheet.
+
+Here is the information I need you to pull from the invoices:
+* Order date (Format as MM/DD/YYYY)
+* Vendor (Extract the vendor's business name from the invoice header or footer)
+* INV (this is the Invoice number or order number)
+* Item (Combine all identifying information (SKU, ISBN, item name, etc.) into a single cell. Separate different values using a dash and a space.)
+* Wholesale (Per-unit price. Look for terms such as "Your Price", "Unit Price", or "Price". Remove currency symbols.)
+* Qty ordered (Quantity shipped. Leave blank if not available or if item is on backorder)
+
+IMPORTANT RULES:
+1. Extract ONLY actual products/merchandise - ignore taxes, shipping fees, discounts, subtotals, and totals
+2. If multiple quantities are shown (ordered vs shipped), use the shipped quantity
+3. For backorders or out-of-stock items, leave Qty ordered blank
+4. Remove all currency symbols ($, etc.) from the Wholesale field
+5. If unit price is not explicitly shown, calculate it from line total ÷ quantity
+6. If no date is found, leave Order date blank
+7. Return results in JSON format with this exact structure:
+
+{
+  "order_date": "MM/DD/YYYY",
+  "vendor": "Vendor Business Name", 
+  "invoice_number": "Invoice/Order Number",
+  "line_items": [
+    {
+      "item": "SKU - Item Name - Additional Info",
+      "wholesale": "0.00",
+      "qty_ordered": "1"
+    }
+  ]
+}
+
+8. Return ONLY the JSON object - no additional text, formatting, or explanations
+9. If you cannot find any products, return: {"order_date": "", "vendor": "", "invoice_number": "", "line_items": []}
+
+Extract from this invoice:"""
+
+        print("🤖 Attempting Gemini AI processing...")
+        
+        # Send PDF to Gemini
+        response = model.generate_content([
+            prompt,
+            {
+                "mime_type": "application/pdf",
+                "data": pdf_content
+            }
+        ])
+        
+        # Parse response
+        result_text = response.text.strip()
+        
+        # Clean JSON response
+        result_text = result_text.replace('```json', '').replace('```', '').strip()
+        
+        # Remove any markdown formatting
+        if result_text.startswith('```'):
+            result_text = result_text.split('\n', 1)[1]
+        if result_text.endswith('```'):
+            result_text = result_text.rsplit('\n', 1)[0]
+        
+        print(f"🔍 Gemini raw response (first 200 chars): {result_text[:200]}...")
+        
+        # Parse JSON
+        gemini_result = json.loads(result_text)
+        
+        # Validate response structure
+        if not isinstance(gemini_result, dict):
+            print("❌ Gemini response is not a JSON object")
+            return None
+            
+        line_items = gemini_result.get('line_items', [])
+        if not line_items or len(line_items) == 0:
+            print("⚠️ Gemini found no line items")
+            return None
+        
+        # Convert to existing row format
+        rows = []
+        order_date = gemini_result.get('order_date', '')
+        vendor = gemini_result.get('vendor', '')
+        invoice_number = gemini_result.get('invoice_number', '')
+        
+        for item in line_items:
+            rows.append([
+                "",  # Column A placeholder
+                order_date,
+                vendor, 
+                invoice_number,
+                item.get('item', ''),
+                item.get('wholesale', ''),
+                item.get('qty_ordered', '')
+            ])
+        
+        print(f"✅ Gemini successfully extracted {len(rows)} line items")
+        return rows, order_date, vendor, invoice_number
+            
+    except json.JSONDecodeError as e:
+        print(f"❌ Gemini JSON parsing failed: {e}")
+        print(f"📄 Raw response: {result_text}")
+        return None
+    except Exception as e:
+        print(f"❌ Gemini processing failed: {e}")
+        return None
 
 
 @functions_framework.http
@@ -32,6 +152,58 @@ def process_invoice(request: Request):
             return jsonify({"error": "Empty file received"}), 400
 
         print(f"Received file upload: {filename}")
+
+        # NEW: Try Gemini AI first for file uploads
+        print("🚀 Starting multi-tier processing: Gemini → Document AI → Fallbacks")
+        gemini_result = process_with_gemini_first(pdf_content)
+
+        if gemini_result:
+            rows, invoice_date, vendor, invoice_number = gemini_result
+            
+            print(f"✅ Gemini processing successful: {len(rows)} items")
+            
+            # Write to Google Sheets
+            try:
+                spreadsheet_id = os.environ.get("GOOGLE_SHEETS_SPREADSHEET_ID")
+                sheet_name = os.environ.get("GOOGLE_SHEETS_SHEET_NAME", "Sheet1")
+                
+                credentials, _ = default()
+                service = build("sheets", "v4", credentials=credentials)
+                sheet = service.spreadsheets()
+
+                result = (
+                    sheet.values()
+                    .append(
+                        spreadsheetId=spreadsheet_id,
+                        range=f"'{sheet_name}'!A:G",
+                        valueInputOption="USER_ENTERED",
+                        insertDataOption="INSERT_ROWS",
+                        body={"values": rows},
+                    )
+                    .execute()
+                )
+
+                return jsonify({
+                    "success": True,
+                    "message": f"✅ Gemini AI processed {len(rows)} items successfully",
+                    "method": "gemini",
+                    "vendor": vendor,
+                    "invoice_number": invoice_number,
+                    "invoice_date": invoice_date,
+                    "items_count": len(rows),
+                    "spreadsheet_updated": True,
+                    "updated_range": result.get("updates", {}).get("updatedRange", ""),
+                })
+                
+            except Exception as e:
+                return jsonify({
+                    "success": False, 
+                    "error": f"Gemini extraction succeeded but Sheets write failed: {str(e)}",
+                    "method": "gemini",
+                    "items_extracted": len(rows)
+                }), 500
+        
+        print("⚠️ Gemini processing failed, falling back to Document AI...")
 
     else:
         # Handle form data from Zapier
@@ -120,6 +292,58 @@ def process_invoice(request: Request):
 
         pdf_content = response.content
         print(f"Downloaded PDF from URL: {file_url}")
+
+    # NEW: Try Gemini AI first
+    print("🚀 Starting multi-tier processing: Gemini → Document AI → Fallbacks")
+    gemini_result = process_with_gemini_first(pdf_content)
+
+    if gemini_result:
+        rows, invoice_date, vendor, invoice_number = gemini_result
+        
+        print(f"✅ Gemini processing successful: {len(rows)} items")
+        
+        # Write to Google Sheets
+        try:
+            spreadsheet_id = os.environ.get("GOOGLE_SHEETS_SPREADSHEET_ID")
+            sheet_name = os.environ.get("GOOGLE_SHEETS_SHEET_NAME", "Sheet1")
+            
+            credentials, _ = default()
+            service = build("sheets", "v4", credentials=credentials)
+            sheet = service.spreadsheets()
+
+            result = (
+                sheet.values()
+                .append(
+                    spreadsheetId=spreadsheet_id,
+                    range=f"'{sheet_name}'!A:G",
+                    valueInputOption="USER_ENTERED",
+                    insertDataOption="INSERT_ROWS",
+                    body={"values": rows},
+                )
+                .execute()
+            )
+
+            return jsonify({
+                "success": True,
+                "message": f"✅ Gemini AI processed {len(rows)} items successfully",
+                "method": "gemini",
+                "vendor": vendor,
+                "invoice_number": invoice_number,
+                "invoice_date": invoice_date,
+                "items_count": len(rows),
+                "spreadsheet_updated": True,
+                "updated_range": result.get("updates", {}).get("updatedRange", ""),
+            })
+            
+        except Exception as e:
+            return jsonify({
+                "success": False, 
+                "error": f"Gemini extraction succeeded but Sheets write failed: {str(e)}",
+                "method": "gemini",
+                "items_extracted": len(rows)
+            }), 500
+    
+    print("⚠️ Gemini processing failed, falling back to Document AI...")
 
     # Step 3: Get configuration from environment variables
     project_id = os.environ.get("GOOGLE_CLOUD_PROJECT_ID")

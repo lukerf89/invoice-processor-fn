@@ -20,14 +20,14 @@ The goal is maintainable, scalable code that can handle new invoices without mod
 
 ## Project Overview
 
-This is a Google Cloud Function that processes invoices using Document AI. It receives webhook requests from Zapier (or legacy Trello) with PDF files or URLs, processes invoices, then writes extracted data to Google Sheets.
+This is a Google Cloud Function that processes invoices using a multi-tier AI approach. It receives webhook requests from Zapier (or legacy Trello) with PDF files or URLs, processes invoices using Gemini AI first (with Document AI as fallback), then writes extracted data to Google Sheets.
 
 ## Tech Stack
 
-- **Runtime**: Python 3.12+ (originally 3.12.11)
+- **Runtime**: Python 3.12+ 
 - **Framework**: Google Cloud Functions with functions-framework
-- **Cloud Services**: Google Cloud Document AI, Google Sheets API
-- **Key Dependencies**: google-cloud-documentai, google-auth, google-api-python-client, requests, flask
+- **Cloud Services**: Google Cloud Document AI, Google Sheets API, Google Gemini AI, Secret Manager
+- **Key Dependencies**: google-cloud-documentai, google-generativeai, google-auth, google-api-python-client, requests, flask
 
 ## Development Commands
 
@@ -68,6 +68,12 @@ python document_ai_explorer.py <pdf_file_path> [--save-json]
 # Test with local sample invoice
 python document_ai_explorer.py new_invoice.pdf --save-json
 
+# Test Gemini AI processing
+python test_gemini.py
+
+# Automated invoice testing workflow
+./test_invoice.sh InvoiceName  # Generates JSON and CSV from PDF
+
 # Run specific test scripts
 python test_scripts/test_invoice_processing.py
 python test_scripts/test_creative_coop.py
@@ -99,14 +105,53 @@ pre-commit run --all-files
 **Single Function Design**: The entire application is implemented as one Cloud Function (`process_invoice` in `main.py`) that handles:
 1. Webhook processing (Zapier integration with multiple input methods)
 2. PDF file processing (direct upload or URL download)
-3. Document AI processing for data extraction
+3. Multi-tier AI processing for data extraction
 4. Data transformation and normalization
 5. Google Sheets integration for output
 
-**Multi-Layer Data Extraction Strategy**:
-- Primary: Entity-based extraction using Document AI entities
-- Fallback: Table-based extraction parsing table structures
-- Final: Text-based extraction using regex patterns
+### Processing Flow
+**Multi-tier Processing Strategy**:
+1. **Tier 1**: Gemini AI (`process_with_gemini_first`) - Primary method using Google's Gemini AI model
+2. **Tier 2**: Document AI Entities (`extract_line_items_from_entities`) - Uses structured entity extraction
+3. **Tier 3**: Document AI Tables (`extract_line_items`) - Processes table data from Document AI
+4. **Tier 4**: Text Parsing (`extract_line_items_from_text`) - Fallback regex-based extraction
+
+### Vendor-Specific Processing
+The system includes specialized handling for different vendors in `main.py`:
+- **HarperCollins**: Handles multi-line descriptions, ISBN extraction
+- **Creative-Coop**: Processes split quantity formats, UPC/style code mapping
+- **OneHundred80**: Handles compact table layouts
+- **Rifle Paper**: Custom description cleaning and line item extraction
+
+### Key Functions
+- `process_with_gemini_first()`: Primary Gemini AI processing with comprehensive prompt
+- `format_date()`: Standardizes date formats across different invoice styles
+- `process_vendor_specific()`: Routes to vendor-specific processing logic
+- `write_to_sheet()`: Handles Google Sheets API integration with proper authentication
+- `clean_and_validate_quantity()`: Ensures quantity values are properly formatted integers
+
+### Environment Variables
+Required for deployment:
+- `GOOGLE_CLOUD_PROJECT_ID`: GCP project ID
+- `DOCUMENT_AI_PROCESSOR_ID`: Document AI processor ID
+- `GOOGLE_CLOUD_LOCATION`: Processing location (usually "us")
+- `GOOGLE_SHEETS_SPREADSHEET_ID`: Target spreadsheet ID
+- `GOOGLE_SHEETS_SHEET_NAME`: Target sheet name
+- `GEMINI_API_KEY`: Stored in Secret Manager for Gemini AI access
+
+### Testing Infrastructure
+- `test_invoices/`: Directory containing sample PDFs and expected outputs
+- `test_scripts/`: Vendor-specific testing and debugging scripts
+- `document_ai_explorer.py`: Standalone tool for analyzing Document AI output
+- `test_invoice.sh`: Automated workflow for generating JSON and CSV from PDFs
+
+## Important Notes
+
+- Always activate the virtual environment before running tests or development server
+- The function uses Application Default Credentials (ADC) for Google Cloud services
+- Gemini API key is stored in Google Secret Manager for production
+- Processing timeout is set to 540 seconds for large invoices
+- Memory allocation is 1GB to handle PDF processing
 
 **Testing Philosophy**: 
 - All processing logic must be algorithmic and pattern-based
