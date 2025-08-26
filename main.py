@@ -997,7 +997,6 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                     ):  # Must have valid price
                         rows.append(
                             [
-                                "",  # Column A placeholder
                                 invoice_date,
                                 vendor,
                                 invoice_number,
@@ -1030,7 +1029,6 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                     ):  # Must have valid price
                         rows.append(
                             [
-                                "",  # Column A placeholder
                                 invoice_date,
                                 vendor,
                                 invoice_number,
@@ -1255,7 +1253,6 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                 if not skip_row:
                     rows.append(
                         [
-                            "",  # Column A placeholder
                             invoice_date,
                             vendor,
                             invoice_number,
@@ -1374,7 +1371,6 @@ def extract_line_items(document, invoice_date, vendor, invoice_number):
                 if item_description and wholesale_price:
                     rows.append(
                         [
-                            "",  # Empty placeholder for column A
                             invoice_date,
                             vendor,
                             invoice_number,
@@ -1440,7 +1436,6 @@ def extract_line_items_from_text(text, invoice_date, vendor, invoice_number):
             if product_code and price:
                 rows.append(
                     [
-                        "",  # Empty placeholder for column A
                         invoice_date,
                         vendor,
                         invoice_number,
@@ -2170,7 +2165,6 @@ def process_harpercollins_document(document):
 
             rows.append(
                 [
-                    "",  # Column A (blank)
                     order_date,  # Column B
                     vendor,  # Column C
                     order_number,  # Column D
@@ -2349,7 +2343,6 @@ def process_creative_coop_document(document):
         if int(ordered_qty) > 0:
             rows.append(
                 [
-                    "",  # Column A placeholder
                     invoice_date,
                     vendor,
                     invoice_number,
@@ -2668,7 +2661,6 @@ def process_onehundred80_document(document):
         if product_code and unit_price and quantity:
             rows.append(
                 [
-                    "",  # Column A placeholder
                     order_date,
                     vendor,
                     purchase_order,
