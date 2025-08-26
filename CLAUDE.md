@@ -185,10 +185,47 @@ gcloud functions deploy process_invoice \
 - Memory allocation is 1GB to handle PDF processing
 - Service account requires `roles/secretmanager.secretAccessor` permission
 
+## Current Status & Known Issues
+
+### Production Status: ✅ WORKING
+- **Zapier Integration**: Fully functional, no timeout issues
+- **Google Sheets**: Data correctly formatted, starts in Column B
+- **Document AI Processing**: Reliable fallback for all invoice types
+- **Multi-vendor Support**: HarperCollins, Creative-Coop, OneHundred80, Rifle Paper, etc.
+
+### Gemini AI Status: 🚧 TEMPORARILY DISABLED  
+- **Reason**: Timeout issues with Zapier's 160-second limit
+- **Current Behavior**: Function immediately falls back to Document AI
+- **Performance**: Document AI completes within timeout limits
+- **Future Plan**: Two-tier architecture documented in `two-tier-fallback-plan.md`
+
+### Known Issues
+- **Cody Foster invoices**: Date parsing occasionally fails (non-critical)
+- **Large PDFs**: May take 60-90 seconds but complete successfully
+- **Credential warnings**: Harmless metadata validation errors in logs
+
+### Recent Fixes Applied
+- **Column Alignment**: Removed Column A placeholders from all Document AI functions
+- **Zapier Timeouts**: Disabled Gemini temporarily to ensure reliable processing
+- **Google Sheets Range**: Updated to `B:G` to match data structure
+
+### Troubleshooting
+
+#### If Zapier timeouts return:
+1. Check function logs for processing time
+2. Verify Document AI is being used (not Gemini)
+3. Consider increasing Zapier webhook timeout if possible
+
+#### If data appears in wrong columns:
+1. Verify all `rows.append()` calls don't include empty string placeholders
+2. Ensure Google Sheets range matches data structure
+3. Check that `range=f"'{sheet_name}'!B:G"` is consistent across all append calls
+
 **Testing Philosophy**: 
 - All processing logic must be algorithmic and pattern-based
 - Test scripts validate logic works across different invoice formats
 - Debug scripts help identify patterns for new invoice types
+- Prioritize Zapier compatibility (160s timeout) over feature completeness
 - No hardcoded product mappings or vendor-specific values
 
 ## Key Components
