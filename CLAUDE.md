@@ -36,8 +36,15 @@ This is a Google Cloud Function that processes invoices using Document AI. It re
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
+# Install dependencies for development
+pip install -r requirements.dev.txt
+
+# Install only production dependencies
 pip install -r requirements.txt
+
+# Format code with Black and isort
+black .
+isort .
 
 # Local development server
 functions-framework --target=process_invoice --debug
@@ -73,6 +80,18 @@ python test_scripts/test_onehundred80.py  # OneHundred80 testing
 
 # Run all vendor-specific tests
 python test_scripts/test_final_creative_coop.py && python test_scripts/perfect_processing.py && python test_scripts/test_onehundred80.py
+
+# Run tests with pytest
+pytest
+
+# Run tests in watch mode (re-runs on file changes)
+pytest-watch
+
+# Setup pre-commit hooks
+pre-commit install
+
+# Run pre-commit hooks manually
+pre-commit run --all-files
 ```
 
 ## Architecture
@@ -88,6 +107,12 @@ python test_scripts/test_final_creative_coop.py && python test_scripts/perfect_p
 - Primary: Entity-based extraction using Document AI entities
 - Fallback: Table-based extraction parsing table structures
 - Final: Text-based extraction using regex patterns
+
+**Testing Philosophy**: 
+- All processing logic must be algorithmic and pattern-based
+- Test scripts validate logic works across different invoice formats
+- Debug scripts help identify patterns for new invoice types
+- No hardcoded product mappings or vendor-specific values
 
 ## Key Components
 
@@ -246,13 +271,17 @@ python test_invoice.py InvoiceName
 
 # Example
 python test_invoice.py Rifle_Paper_INV_J7XM9XQ3HB
+
+# Alternative: Use bash script version
+./test_invoice.sh InvoiceName
 ```
 
 This automatically:
-1. Generates JSON from PDF using Document AI
-2. Processes JSON through main.py functions
-3. Saves CSV output with extracted line items
-4. Provides detailed processing summary
+1. Sets required environment variables
+2. Generates JSON from PDF using Document AI (if not already exists)
+3. Processes JSON through main.py functions
+4. Saves CSV output with extracted line items
+5. Provides detailed processing summary with metrics
 
 #### **Manual Step-by-Step Process**
 For testing new invoices manually, follow this standardized process:
@@ -296,6 +325,22 @@ The codebase uses a comprehensive testing approach:
 - `debug_quantities.py` - Debug quantity extraction logic
 - `debug_descriptions.py` - Debug description extraction
 - `debug_position_mapping.py` - Debug product position mapping
+
+## Code Quality & Linting
+
+The project uses automated code formatting and quality checks:
+
+- **Black**: Code formatter with line length 88 (Python standard)
+- **isort**: Import sorting, configured to work with Black
+- **Pre-commit hooks**: Automated checks on commit including:
+  - pytest tests
+  - Conventional commits format
+  - Trailing whitespace removal
+  - End of file fixer
+  - Large file checks
+  - Black and isort formatting
+
+**GitHub Actions**: CI/CD pipeline runs Black and isort checks on push/PR
 
 ## Deployment
 
