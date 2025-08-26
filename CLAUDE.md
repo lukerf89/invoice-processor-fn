@@ -145,6 +145,37 @@ Required for deployment:
 - `document_ai_explorer.py`: Standalone tool for analyzing Document AI output
 - `test_invoice.sh`: Automated workflow for generating JSON and CSV from PDFs
 
+## Deployment
+
+### Prerequisites
+Before deploying, ensure the service account has Secret Manager access:
+
+```bash
+# Check if Gemini API key secret exists
+gcloud secrets list --filter="name:gemini-api-key"
+
+# Grant Secret Manager access to compute service account
+gcloud projects add-iam-policy-binding freckled-hen-analytics \
+    --member="serviceAccount:774385943442-compute@developer.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor"
+```
+
+### Deploy Command
+```bash
+gcloud functions deploy process_invoice \
+    --gen2 \
+    --runtime python312 \
+    --trigger-http \
+    --allow-unauthenticated \
+    --memory=1GiB \
+    --timeout=540s \
+    --region=us-central1 \
+    --entry-point=process_invoice \
+    --source=. \
+    --set-env-vars="GOOGLE_CLOUD_PROJECT_ID=freckled-hen-analytics,DOCUMENT_AI_PROCESSOR_ID=be53c6e3a199a473,GOOGLE_CLOUD_LOCATION=us,GOOGLE_SHEETS_SPREADSHEET_ID=1PdnZGPZwAV6AHXEeByhOlaEeGObxYWppwLcq0gdvs0E,GOOGLE_SHEETS_SHEET_NAME=Update 20230525" \
+    --set-secrets="GEMINI_API_KEY=gemini-api-key:latest"
+```
+
 ## Important Notes
 
 - Always activate the virtual environment before running tests or development server
@@ -152,6 +183,7 @@ Required for deployment:
 - Gemini API key is stored in Google Secret Manager for production
 - Processing timeout is set to 540 seconds for large invoices
 - Memory allocation is 1GB to handle PDF processing
+- Service account requires `roles/secretmanager.secretAccessor` permission
 
 **Testing Philosophy**: 
 - All processing logic must be algorithmic and pattern-based
