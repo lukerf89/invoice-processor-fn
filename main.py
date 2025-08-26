@@ -117,6 +117,8 @@ Extract from this invoice:"""
         order_date = gemini_result.get("order_date", "")
         vendor = gemini_result.get("vendor", "")
         invoice_number = gemini_result.get("invoice_number", "")
+        
+        print(f"📊 Gemini extracted - Date: '{order_date}', Vendor: '{vendor}', Invoice: '{invoice_number}'")
 
         for item in line_items:
             rows.append(
@@ -132,6 +134,7 @@ Extract from this invoice:"""
             )
 
         print(f"✅ Gemini successfully extracted {len(rows)} line items")
+        print(f"📋 Sample row: {rows[0] if rows else 'No rows'}")
         return rows, order_date, vendor, invoice_number
 
     except json.JSONDecodeError as e:
