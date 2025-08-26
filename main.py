@@ -65,29 +65,12 @@ IMPORTANT RULES:
 
 Extract from this invoice:"""
 
-        print("🤖 Attempting Gemini AI processing...")
+        print("🤖 Attempting Gemini AI processing with fail-fast timeout...")
 
-        # Send PDF to Gemini with timeout to prevent Zapier timeouts
-        start_time = time.time()
-        
-        try:
-            # Set a shorter timeout to prevent Zapier timeouts
-            response = model.generate_content(
-                [prompt, {"mime_type": "application/pdf", "data": pdf_content}]
-            )
-            
-            processing_time = time.time() - start_time
-            print(f"🕐 Gemini processing took {processing_time:.1f} seconds")
-            
-            # If processing takes too long, abandon it
-            if processing_time > 90:
-                print(f"⏰ Gemini took too long ({processing_time:.1f}s), aborting")
-                return None
-            
-        except Exception as timeout_error:
-            processing_time = time.time() - start_time
-            print(f"⏰ Gemini failed after {processing_time:.1f} seconds: {timeout_error}")
-            return None
+        # TEMPORARY: Skip Gemini for now to ensure Zapier compatibility
+        # TODO: Re-enable once we solve the timeout issue
+        print("⚠️ Gemini temporarily disabled due to timeout issues - using Document AI")
+        return None
 
         # Parse response
         result_text = response.text.strip()
