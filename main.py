@@ -71,18 +71,22 @@ Extract from this invoice:"""
         start_time = time.time()
         
         try:
-            # Set a 90-second timeout to ensure we have time for fallback processing
+            # Set a shorter timeout to prevent Zapier timeouts
             response = model.generate_content(
-                [prompt, {"mime_type": "application/pdf", "data": pdf_content}],
-                request_options={"timeout": 90}
+                [prompt, {"mime_type": "application/pdf", "data": pdf_content}]
             )
             
             processing_time = time.time() - start_time
             print(f"🕐 Gemini processing took {processing_time:.1f} seconds")
             
+            # If processing takes too long, abandon it
+            if processing_time > 90:
+                print(f"⏰ Gemini took too long ({processing_time:.1f}s), aborting")
+                return None
+            
         except Exception as timeout_error:
             processing_time = time.time() - start_time
-            print(f"⏰ Gemini timeout after {processing_time:.1f} seconds: {timeout_error}")
+            print(f"⏰ Gemini failed after {processing_time:.1f} seconds: {timeout_error}")
             return None
 
         # Parse response
@@ -123,13 +127,12 @@ Extract from this invoice:"""
         for item in line_items:
             rows.append(
                 [
-                    "",  # Column A placeholder
-                    order_date,
-                    vendor,
-                    invoice_number,
-                    item.get("item", ""),
-                    item.get("wholesale", ""),
-                    item.get("qty_ordered", ""),
+                    order_date,      # Column B - Order Date  
+                    vendor,          # Column C - Vendor
+                    invoice_number,  # Column D - Invoice Number
+                    item.get("item", ""),        # Column E - Item Description
+                    item.get("wholesale", ""),   # Column F - Wholesale Price  
+                    item.get("qty_ordered", ""), # Column G - Quantity
                 ]
             )
 
@@ -191,7 +194,7 @@ def process_invoice(request: Request):
                     sheet.values()
                     .append(
                         spreadsheetId=spreadsheet_id,
-                        range=f"'{sheet_name}'!A:G",
+                        range=f"'{sheet_name}'!B:G",
                         valueInputOption="USER_ENTERED",
                         insertDataOption="INSERT_ROWS",
                         body={"values": rows},
@@ -340,7 +343,7 @@ def process_invoice(request: Request):
                 sheet.values()
                 .append(
                     spreadsheetId=spreadsheet_id,
-                    range=f"'{sheet_name}'!A:G",
+                    range=f"'{sheet_name}'!B:G",
                     valueInputOption="USER_ENTERED",
                     insertDataOption="INSERT_ROWS",
                     body={"values": rows},
