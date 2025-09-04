@@ -53,3 +53,4 @@ test_invoices/
 
 # Development/debug files (now in test_scripts/)
 test_scripts/
+test-invoice-processor-workspace/
