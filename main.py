@@ -581,7 +581,7 @@ def process_invoice(request: Request):
             sheet.values()
             .append(
                 spreadsheetId=spreadsheet_id,
-                range=f"'{sheet_name}'!A:G",
+                range=f"'{sheet_name}'!B:G",
                 valueInputOption="USER_ENTERED",
                 insertDataOption="INSERT_ROWS",
                 body={"values": rows},
