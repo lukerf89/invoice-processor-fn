@@ -14,9 +14,9 @@ from googleapiclient.discovery import build
 
 def process_with_gemini_first(pdf_content):
     """Try Gemini AI first for invoice processing"""
-    
+
     import time
-    
+
     try:
         # Configure Gemini
         api_key = os.environ.get("GEMINI_API_KEY")
@@ -104,18 +104,20 @@ Extract from this invoice:"""
         order_date = gemini_result.get("order_date", "")
         vendor = gemini_result.get("vendor", "")
         invoice_number = gemini_result.get("invoice_number", "")
-        
-        print(f"📊 Gemini extracted - Date: '{order_date}', Vendor: '{vendor}', Invoice: '{invoice_number}'")
+
+        print(
+            f"📊 Gemini extracted - Date: '{order_date}', Vendor: '{vendor}', Invoice: '{invoice_number}'"
+        )
 
         for item in line_items:
             rows.append(
                 [
-                    order_date,      # Column B - Order Date  
-                    vendor,          # Column C - Vendor
+                    order_date,  # Column B - Order Date
+                    vendor,  # Column C - Vendor
                     invoice_number,  # Column D - Invoice Number
-                    item.get("item", ""),        # Column E - Item Description
-                    item.get("wholesale", ""),   # Column F - Wholesale Price  
-                    item.get("qty_ordered", ""), # Column G - Quantity
+                    item.get("item", ""),  # Column E - Item Description
+                    item.get("wholesale", ""),  # Column F - Wholesale Price
+                    item.get("qty_ordered", ""),  # Column G - Quantity
                 ]
             )
 
