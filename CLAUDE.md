@@ -446,6 +446,11 @@ The project uses automated code formatting and quality checks:
 
 - **Black**: Code formatter with line length 88 (Python standard)
 - **isort**: Import sorting, configured to work with Black
+- **Claude Code Auto-Formatting**: Automatic formatting hooks that run after every file edit
+  - Triggers on Edit, Write, and MultiEdit operations
+  - Runs `black . && isort . --profile black` automatically
+  - Ensures consistent formatting without manual intervention
+  - Prevents GitHub Actions lint failures
 - **Pre-commit hooks**: Automated checks on commit including:
   - pytest tests
   - Conventional commits format
@@ -455,6 +460,15 @@ The project uses automated code formatting and quality checks:
   - Black and isort formatting
 
 **GitHub Actions**: CI/CD pipeline runs Black and isort checks on push/PR
+
+**Manual Formatting**: If needed, run formatting manually:
+```bash
+# Format code and organize imports
+black . && isort . --profile black
+
+# Run pre-commit hooks manually
+pre-commit run --all-files
+```
 
 ## Deployment
 
