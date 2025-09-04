@@ -2158,10 +2158,7 @@ def process_harpercollins_document(document):
             description = f"{isbn} - {title}"
 
             # Format price with proper decimals
-            if wholesale_price == int(wholesale_price):
-                price_str = str(int(wholesale_price))
-            else:
-                price_str = f"{wholesale_price:.3f}"
+            price_str = f"{wholesale_price:.2f}"
 
             rows.append(
                 [
@@ -2170,7 +2167,7 @@ def process_harpercollins_document(document):
                     order_number,  # Column D
                     description,  # Column E
                     price_str,  # Column F
-                    str(quantity),  # Column G
+                    quantity,  # Column G
                 ]
             )
 
