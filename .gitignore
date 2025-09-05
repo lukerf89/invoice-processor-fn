@@ -60,3 +60,5 @@ test_invoices/
 # Development/debug files - Include test_scripts in repo for development workflow
 # test_scripts/ - REMOVED from .gitignore to include in repo
 test-invoice-processor-workspace/
+
+# Pre-commit hooks test comment for verification
