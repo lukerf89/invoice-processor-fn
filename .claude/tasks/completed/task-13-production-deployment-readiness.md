@@ -28,28 +28,28 @@ from main import process_creative_coop_document, detect_vendor_type, process_inv
 
 def test_production_load_simulation():
     """Test system under realistic production load"""
-    
+
     # Simulate concurrent webhook requests (typical Zapier load)
     concurrent_requests = 10
     test_documents = []
-    
+
     # Create test documents representing typical production mix
     test_documents.extend([
         create_cs_error2_document(),  # Tabular XS format
         create_traditional_d_code_document(),  # Pattern-based D format
         create_mixed_format_document(),  # Mixed content
     ] * 4)  # 12 total documents
-    
+
     results = []
     errors = []
-    
+
     def process_document_worker(doc_index, document):
         """Worker function to process a single document"""
         try:
             start_time = time.time()
             rows = process_creative_coop_document(document)
             end_time = time.time()
-            
+
             processing_time = end_time - start_time
             results.append({
                 'doc_index': doc_index,
@@ -63,7 +63,7 @@ def test_production_load_simulation():
                 'error': str(e),
                 'success': False
             })
-    
+
     # Launch concurrent processing threads
     threads = []
     for i, document in enumerate(test_documents[:concurrent_requests]):
@@ -72,38 +72,38 @@ def test_production_load_simulation():
             args=(i, document)
         )
         threads.append(thread)
-    
+
     # Start all threads simultaneously
     start_time = time.time()
     for thread in threads:
         thread.start()
-    
+
     # Wait for all to complete
     for thread in threads:
         thread.join(timeout=60)  # 60 second timeout per thread
-    
+
     total_time = time.time() - start_time
-    
+
     # Analyze results
     successful_processes = len([r for r in results if r['success']])
     failed_processes = len(errors)
-    
+
     print(f"\\n🚀 Production Load Test Results:")
     print(f"Concurrent requests: {concurrent_requests}")
     print(f"Successful processes: {successful_processes}/{concurrent_requests}")
     print(f"Failed processes: {failed_processes}")
     print(f"Total processing time: {total_time:.2f}s")
-    
+
     if results:
         avg_processing_time = sum(r['processing_time'] for r in results) / len(results)
         max_processing_time = max(r['processing_time'] for r in results)
         total_rows = sum(r['rows_extracted'] for r in results)
-        
+
         print(f"Average processing time: {avg_processing_time:.2f}s")
         print(f"Maximum processing time: {max_processing_time:.2f}s")
         print(f"Total rows extracted: {total_rows}")
         print(f"Overall throughput: {total_rows/total_time:.1f} rows/second")
-    
+
     # Production requirements
     assert successful_processes >= concurrent_requests * 0.95, f"Success rate {successful_processes/concurrent_requests:.1%} below 95%"
     assert max_processing_time < 160, f"Max processing time {max_processing_time:.2f}s exceeds Zapier 160s timeout"
@@ -111,7 +111,7 @@ def test_production_load_simulation():
 
 def test_error_recovery_production_scenarios():
     """Test error recovery for realistic production failure scenarios"""
-    
+
     error_scenarios = [
         {
             "name": "Network timeout during webhook processing",
@@ -134,16 +134,16 @@ def test_error_recovery_production_scenarios():
             "expected_behavior": "Thread-safe processing without data corruption"
         }
     ]
-    
+
     recovery_results = {}
-    
+
     for scenario in error_scenarios:
         print(f"\\nTesting: {scenario['name']}")
-        
+
         try:
             if callable(scenario['setup']):
                 test_condition = scenario['setup']()
-                
+
                 if hasattr(test_condition, '__enter__'):
                     # Context manager (like patch)
                     with test_condition:
@@ -151,46 +151,46 @@ def test_error_recovery_production_scenarios():
                 else:
                     # Direct test data
                     result = test_error_scenario_with_data(scenario['name'], test_condition)
-            
+
             recovery_results[scenario['name']] = {
                 'success': True,
                 'behavior': result
             }
             print(f"✅ {scenario['name']}: Handled gracefully")
-            
+
         except Exception as e:
             recovery_results[scenario['name']] = {
                 'success': False,
                 'error': str(e)
             }
             print(f"❌ {scenario['name']}: Failed - {e}")
-    
+
     # All scenarios should be handled gracefully
     failed_scenarios = [name for name, result in recovery_results.items() if not result['success']]
     assert len(failed_scenarios) == 0, f"Failed to handle error scenarios: {failed_scenarios}"
 
 def test_production_monitoring_and_alerting():
     """Test production monitoring capabilities"""
-    
+
     # Test logging output for production monitoring
     import io
     import sys
     from contextlib import redirect_stdout, redirect_stderr
-    
+
     document = create_cs_error2_document()
-    
+
     # Capture all output
     stdout_capture = io.StringIO()
     stderr_capture = io.StringIO()
-    
+
     with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
         start_time = time.time()
         rows = process_creative_coop_document(document)
         end_time = time.time()
-    
+
     stdout_content = stdout_capture.getvalue()
     stderr_content = stderr_capture.getvalue()
-    
+
     # Validate monitoring information is logged
     monitoring_checks = {
         'processing_time_logged': 'Processing time' in stdout_content or 'seconds' in stdout_content,
@@ -199,39 +199,39 @@ def test_production_monitoring_and_alerting():
         'extraction_counts_logged': any(str(i) in stdout_content for i in range(10, 50)),
         'error_handling_logged': len(stderr_content) == 0 or 'ERROR' not in stderr_content
     }
-    
+
     print(f"\\n📊 Production Monitoring Validation:")
     for check, passed in monitoring_checks.items():
         status = "✅ PASS" if passed else "❌ FAIL"
         print(f"   {check.replace('_', ' ').title()}: {status}")
-    
+
     # All monitoring checks should pass
     failed_checks = [check for check, passed in monitoring_checks.items() if not passed]
     assert len(failed_checks) == 0, f"Monitoring checks failed: {failed_checks}"
 
 def test_security_production_hardening():
     """Test security aspects for production deployment"""
-    
+
     security_tests = []
-    
+
     # Test 1: Large PDF handling (DoS protection)
     def test_large_pdf_handling():
         # Simulate very large PDF processing
         large_text = "X" * 1000000  # 1MB of text
         document = create_mock_document(large_text)
-        
+
         start_time = time.time()
         try:
             rows = process_creative_coop_document(document)
             processing_time = time.time() - start_time
-            
+
             # Should complete within reasonable time and memory
             assert processing_time < 60, f"Large PDF took {processing_time:.2f}s, risk of DoS"
             return True
         except Exception as e:
             # Should handle gracefully, not crash
             return "handled_gracefully" in str(e).lower()
-    
+
     # Test 2: Malicious content handling
     def test_malicious_content_handling():
         malicious_patterns = [
@@ -240,7 +240,7 @@ def test_security_production_hardening():
             "'; DROP TABLE invoices; --",     # SQL injection attempt
             "../../../etc/passwd",            # Path traversal attempt
         ]
-        
+
         for pattern in malicious_patterns:
             document = create_mock_document(f"XS9826A {pattern} 24 0 0 24 each 2.00 1.60 38.40")
             try:
@@ -250,57 +250,57 @@ def test_security_production_hardening():
             except Exception as e:
                 # Should not fail due to malicious content
                 return False
-        
+
         return True
-    
+
     # Test 3: Memory exhaustion protection
     def test_memory_exhaustion_protection():
         # Test with many repeated patterns
         large_document_lines = []
         for i in range(10000):  # 10k products
             large_document_lines.append(f"XS{i:04d}A | 191009{i:06d} | Product {i} | 1 | 0 | 0 | 1 | each | 2.00 | 1.60 | 1.60")
-        
+
         large_text = "\\n".join(large_document_lines)
         document = create_mock_document(large_text)
-        
+
         import psutil
         import os
-        
+
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
-        
+
         try:
             rows = process_creative_coop_document(document)
-            
+
             final_memory = process.memory_info().rss / 1024 / 1024
             memory_growth = final_memory - initial_memory
-            
+
             # Memory growth should be reasonable
             assert memory_growth < 500, f"Memory grew by {memory_growth:.1f}MB, potential memory exhaustion"
             return True
         except Exception as e:
             # Should handle large documents gracefully
             return "memory" in str(e).lower() or "limit" in str(e).lower()
-    
+
     # Run security tests
     security_results = {
         'large_pdf_handling': test_large_pdf_handling(),
         'malicious_content_handling': test_malicious_content_handling(),
         'memory_exhaustion_protection': test_memory_exhaustion_protection()
     }
-    
+
     print(f"\\n🔒 Security Hardening Results:")
     for test_name, passed in security_results.items():
         status = "✅ PASS" if passed else "❌ FAIL"
         print(f"   {test_name.replace('_', ' ').title()}: {status}")
-    
+
     # All security tests should pass
     failed_security_tests = [test for test, passed in security_results.items() if not passed]
     assert len(failed_security_tests) == 0, f"Security tests failed: {failed_security_tests}"
 
 def test_zapier_webhook_compatibility():
     """Test full compatibility with Zapier webhook patterns"""
-    
+
     # Test different Zapier input formats
     zapier_test_cases = [
         {
@@ -309,7 +309,7 @@ def test_zapier_webhook_compatibility():
             "expected": "Should process uploaded PDF file"
         },
         {
-            "name": "URL-based processing", 
+            "name": "URL-based processing",
             "payload": {"file_url": "https://example.com/invoice.pdf"},
             "expected": "Should download and process PDF from URL"
         },
@@ -319,84 +319,84 @@ def test_zapier_webhook_compatibility():
             "expected": "Should handle form data input method"
         }
     ]
-    
+
     compatibility_results = {}
-    
+
     for test_case in zapier_test_cases:
         print(f"\\nTesting Zapier format: {test_case['name']}")
-        
+
         # Mock the webhook processing
         with patch('main.process_invoice') as mock_process:
             mock_process.return_value = ("Success", 200)
-            
+
             try:
                 # Simulate Zapier webhook call
                 result = simulate_zapier_webhook(test_case['payload'])
-                
+
                 compatibility_results[test_case['name']] = {
                     'success': True,
                     'result': result
                 }
                 print(f"✅ {test_case['name']}: Compatible")
-                
+
             except Exception as e:
                 compatibility_results[test_case['name']] = {
                     'success': False,
                     'error': str(e)
                 }
                 print(f"❌ {test_case['name']}: Failed - {e}")
-    
+
     # All Zapier formats should be compatible
     failed_formats = [name for name, result in compatibility_results.items() if not result['success']]
     assert len(failed_formats) == 0, f"Zapier compatibility failed for: {failed_formats}"
 
 def test_production_performance_benchmarks():
     """Test performance under production-like conditions"""
-    
+
     # Performance benchmark scenarios
     benchmark_scenarios = [
         {"name": "Single CS Error 2", "documents": [create_cs_error2_document()], "target_time": 15.0},
         {"name": "Multiple D-code invoices", "documents": [create_traditional_d_code_document()] * 5, "target_time": 10.0},
         {"name": "Mixed format batch", "documents": [create_cs_error2_document(), create_traditional_d_code_document(), create_mixed_format_document()], "target_time": 25.0},
     ]
-    
+
     benchmark_results = {}
-    
+
     for scenario in benchmark_scenarios:
         print(f"\\nBenchmarking: {scenario['name']}")
-        
+
         processing_times = []
         total_rows = 0
-        
+
         # Run multiple iterations for accurate benchmarking
         for iteration in range(3):
             start_time = time.time()
-            
+
             iteration_rows = 0
             for document in scenario['documents']:
                 rows = process_creative_coop_document(document)
                 iteration_rows += len(rows)
-            
+
             end_time = time.time()
             processing_time = end_time - start_time
             processing_times.append(processing_time)
             total_rows = max(total_rows, iteration_rows)
-        
+
         avg_time = sum(processing_times) / len(processing_times)
         max_time = max(processing_times)
-        
+
         benchmark_results[scenario['name']] = {
             'avg_time': avg_time,
             'max_time': max_time,
             'total_rows': total_rows,
             'meets_target': avg_time <= scenario['target_time']
         }
-        
+
         status = "✅ PASS" if avg_time <= scenario['target_time'] else "❌ FAIL"
         print(f"   Average time: {avg_time:.2f}s (target: {scenario['target_time']}s) {status}")
         print(f"   Max time: {max_time:.2f}s")
         print(f"   Rows extracted: {total_rows}")
-    
+
     # All benchmarks should meet targets
     failed_benchmarks = [name for name, result in benchmark_results.items() if not result['meets_target']]
     assert len(failed_benchmarks) == 0, f"Performance benchmarks failed: {failed_benchmarks}"
@@ -424,13 +424,13 @@ def create_mixed_format_document():
     """Create mixed format document for testing"""
     mixed_text = """
     Creative-Coop Mixed Invoice
-    
+
     Tabular section:
     XS9826A | 191009727774 | Product | 24 | 0 | 0 | 24 | each | 2.00 | 1.60 | 38.40
-    
+
     Pattern section:
     DF6802 Vase 8 0 Set $12.50 $100.00
-    
+
     Context section:
     ST1234: Cotton Throw
     Price: $8.00 wholesale
@@ -444,7 +444,7 @@ def create_mock_document(text):
         def __init__(self, text):
             self.text = text
             self.entities = []
-            
+
             # Create basic entity for testing
             entity = type("Entity", (), {})()
             entity.type_ = "line_item"
@@ -452,7 +452,7 @@ def create_mock_document(text):
             entity.confidence = 0.9
             entity.properties = []
             self.entities.append(entity)
-    
+
     return MockDocument(text)
 
 def simulate_zapier_webhook(payload):
@@ -468,12 +468,12 @@ def simulate_zapier_webhook(payload):
 
 def run_production_readiness_validation():
     """Run comprehensive production deployment validation"""
-    
+
     print("🚀 Production Deployment Readiness Validation")
     print("=" * 70)
-    
+
     validation_start_time = time.time()
-    
+
     # Comprehensive validation suite
     validation_suites = {
         'load_testing': test_production_load_simulation,
@@ -483,24 +483,24 @@ def run_production_readiness_validation():
         'zapier_compatibility': test_zapier_webhook_compatibility,
         'performance_benchmarks': test_production_performance_benchmarks
     }
-    
+
     validation_results = {}
-    
+
     for suite_name, test_function in validation_suites.items():
         print(f"\\n{'='*20} {suite_name.replace('_', ' ').title()} {'='*20}")
-        
+
         try:
             suite_start_time = time.time()
             test_function()
             suite_end_time = time.time()
-            
+
             validation_results[suite_name] = {
                 'success': True,
                 'duration': suite_end_time - suite_start_time,
                 'error': None
             }
             print(f"✅ {suite_name.replace('_', ' ').title()}: PASSED")
-            
+
         except Exception as e:
             suite_end_time = time.time()
             validation_results[suite_name] = {
@@ -509,22 +509,22 @@ def run_production_readiness_validation():
                 'error': str(e)
             }
             print(f"❌ {suite_name.replace('_', ' ').title()}: FAILED - {e}")
-    
+
     # Generate production readiness report
     generate_production_readiness_report(validation_results)
-    
+
     # Calculate overall success rate
     successful_suites = sum(1 for result in validation_results.values() if result['success'])
     total_suites = len(validation_results)
     success_rate = successful_suites / total_suites
-    
+
     total_validation_time = time.time() - validation_start_time
-    
+
     print(f"\\n{'='*70}")
     print(f"Production Readiness Summary:")
     print(f"  Successful validations: {successful_suites}/{total_suites} ({success_rate:.1%})")
     print(f"  Total validation time: {total_validation_time:.2f} seconds")
-    
+
     if success_rate == 1.0:
         print("\\n🎉 PRODUCTION READY!")
         print("✅ All validation suites passed")
@@ -540,43 +540,43 @@ def run_production_readiness_validation():
 
 def generate_production_readiness_report(validation_results):
     """Generate comprehensive production readiness report"""
-    
+
     report_path = "/Volumes/Working/Code/GoogleCloud/invoice-processor-fn/test_invoices/production_readiness_report.md"
-    
+
     with open(report_path, "w", encoding="utf-8") as report:
         report.write("# Creative-Coop Production Deployment Readiness Report\\n\\n")
         report.write(f"**Report Generated:** {time.strftime('%Y-%m-%d %H:%M:%S')}\\n")
         report.write(f"**Phase:** Phase 02 - Tabular Format Support\\n\\n")
-        
+
         # Executive summary
         successful_suites = sum(1 for result in validation_results.values() if result['success'])
         total_suites = len(validation_results)
         success_rate = successful_suites / total_suites
-        
+
         report.write("## Executive Summary\\n\\n")
         report.write(f"- **Overall Success Rate:** {success_rate:.1%} ({successful_suites}/{total_suites} suites)\\n")
-        
+
         if success_rate == 1.0:
             report.write("- **Deployment Status:** ✅ READY FOR PRODUCTION\\n")
         else:
             report.write("- **Deployment Status:** ❌ NOT READY - Issues need resolution\\n")
-        
+
         report.write("\\n## Validation Results\\n\\n")
-        
+
         for suite_name, result in validation_results.items():
             status = "✅ PASS" if result['success'] else "❌ FAIL"
             report.write(f"### {suite_name.replace('_', ' ').title()}\\n")
             report.write(f"- **Status:** {status}\\n")
             report.write(f"- **Duration:** {result['duration']:.2f} seconds\\n")
-            
+
             if result['error']:
                 report.write(f"- **Error:** {result['error']}\\n")
-            
+
             report.write("\\n")
-        
+
         # Deployment checklist
         report.write("## Production Deployment Checklist\\n\\n")
-        
+
         checklist_items = [
             ("Load Testing", validation_results.get('load_testing', {}).get('success', False)),
             ("Error Recovery", validation_results.get('error_recovery', {}).get('success', False)),
@@ -585,13 +585,13 @@ def generate_production_readiness_report(validation_results):
             ("Zapier Compatibility", validation_results.get('zapier_compatibility', {}).get('success', False)),
             ("Performance Benchmarks", validation_results.get('performance_benchmarks', {}).get('success', False))
         ]
-        
+
         for item, passed in checklist_items:
             status = "✅" if passed else "❌"
             report.write(f"- {status} {item}\\n")
-        
+
         report.write("\\n## Next Steps\\n\\n")
-        
+
         if success_rate == 1.0:
             report.write("### Ready for Deployment\\n")
             report.write("1. Deploy to production environment\\n")
@@ -605,7 +605,7 @@ def generate_production_readiness_report(validation_results):
                 report.write(f"1. Fix {suite.replace('_', ' ')} validation failures\\n")
             report.write("2. Re-run production readiness validation\\n")
             report.write("3. Proceed with deployment once all validations pass\\n")
-    
+
     print(f"\\n📋 Production readiness report generated: {report_path}")
 
 if __name__ == "__main__":
@@ -619,26 +619,26 @@ if __name__ == "__main__":
 
 def prepare_for_production_deployment():
     """Apply final optimizations and prepare for production deployment"""
-    
+
     print("🔧 Applying final production optimizations...")
-    
+
     # 1. Performance optimizations
     optimize_processing_performance()
-    
+
     # 2. Monitoring and logging enhancements
     enhance_production_monitoring()
-    
+
     # 3. Error handling improvements
     improve_error_handling_robustness()
-    
+
     # 4. Security hardening
     apply_security_hardening()
-    
+
     print("✅ Production optimizations applied")
 
 def optimize_processing_performance():
     """Apply final performance optimizations"""
-    
+
     # Compile regex patterns for better performance
     # Cache frequently accessed data
     # Optimize memory usage patterns
@@ -647,7 +647,7 @@ def optimize_processing_performance():
 
 def enhance_production_monitoring():
     """Enhance monitoring and observability for production"""
-    
+
     # Add structured logging with correlation IDs
     # Include performance metrics in logs
     # Add error tracking and alerting hooks
@@ -656,16 +656,16 @@ def enhance_production_monitoring():
 
 def improve_error_handling_robustness():
     """Improve error handling for production robustness"""
-    
+
     # Add comprehensive exception handling
     # Implement graceful degradation strategies
-    # Add retry logic for transient failures  
+    # Add retry logic for transient failures
     # Include detailed error context in logs
     pass
 
 def apply_security_hardening():
     """Apply security hardening measures"""
-    
+
     # Validate input data more thoroughly
     # Implement resource usage limits
     # Add input sanitization

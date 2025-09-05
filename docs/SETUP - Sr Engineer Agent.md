@@ -90,10 +90,10 @@ def test_[specific_behavior]_when_[condition]():
     # Arrange
     mock_document = load_test_invoice('test_invoices/sample.pdf')
     expected_result = [expected_line_items]
-    
+
     # Act
     result = [function_under_test](mock_document)
-    
+
     # Assert
     assert result == expected_result
     assert len(result) > 0
@@ -164,7 +164,7 @@ When reviewing code from the coding agent:
 **Issues Found**:
 - [ ] [Specific test improvement needed]
 
-## Engineering Principles Compliance  
+## Engineering Principles Compliance
 **Applied**: [List principles 1-10 that are correctly implemented]
 **Missing**: [List principles that need attention]
 
@@ -177,7 +177,7 @@ When reviewing code from the coding agent:
 - [ ] **AI Integration**: Proper error handling for Document AI/Gemini failures
 - [ ] **Performance**: Within timeout limits
 
-## Improvement Suggestions  
+## Improvement Suggestions
 - [ ] [Performance optimization]
 - [ ] [Code quality improvement]
 
@@ -235,12 +235,12 @@ def test_document_ai_extracts_line_items_successfully():
     expected_items = [
         {'product_code': 'DF6802', 'description': 'Test Product', 'quantity': 8, 'price': 12.50}
     ]
-    
+
     # Act
     with patch('google.cloud.documentai.DocumentProcessorServiceClient') as mock_client:
         mock_client.return_value.process_document.return_value = mock_document_response
         result = extract_line_items_from_entities(mock_document_response)
-    
+
     # Assert
     assert len(result) == len(expected_items)
     assert all(item['product_code'] for item in result)
@@ -249,7 +249,7 @@ def test_handles_document_ai_service_failure():
     # Arrange
     error_response = Mock()
     error_response.side_effect = Exception("Document AI service unavailable")
-    
+
     # Act & Assert
     with patch('google.cloud.documentai.DocumentProcessorServiceClient') as mock_client:
         mock_client.return_value.process_document = error_response
@@ -264,10 +264,10 @@ def test_creative_coop_quantity_extraction():
     # Arrange
     text_snippet = "DF6802 8 0 lo each $12.50 $100.00"
     expected_quantity = 8
-    
+
     # Act
     quantity = extract_creative_coop_quantity(text_snippet)
-    
+
     # Assert
     assert quantity == expected_quantity
 
@@ -275,10 +275,10 @@ def test_harpercollins_isbn_title_formatting():
     # Arrange
     raw_text = "9780062315007 The Great Book Title"
     expected_format = "9780062315007; The Great Book Title"
-    
+
     # Act
     result = format_harpercollins_book_data(raw_text)
-    
+
     # Assert
     assert result == expected_format
 ```
@@ -292,12 +292,12 @@ def test_writes_invoice_data_to_sheets():
         ['INV123', '2023-01-01', 'DF6802', 'Test Product', 8, 12.50]
     ]
     mock_service = Mock()
-    
+
     # Act
     with patch('googleapiclient.discovery.build') as mock_build:
         mock_build.return_value = mock_service
         write_to_sheet(line_items, 'TestSheet')
-    
+
     # Assert
     mock_service.spreadsheets().values().append.assert_called_once()
 
@@ -306,7 +306,7 @@ def test_handles_sheets_api_rate_limit():
     rate_limit_error = Mock()
     rate_limit_error.status = 429
     rate_limit_error.reason = "Rate Limit Exceeded"
-    
+
     # Act & Assert
     with patch('googleapiclient.discovery.build') as mock_build:
         mock_build.return_value.spreadsheets.return_value.values.return_value.append.side_effect = rate_limit_error
@@ -323,12 +323,12 @@ def test_invoice_processing_within_timeout_limits():
     # Arrange
     large_invoice = load_test_file('test_invoices/large_creative_coop.pdf')
     timeout_limit = 160  # Zapier timeout limit
-    
+
     # Act
     start_time = time.time()
     result = process_invoice(large_invoice)
     processing_time = time.time() - start_time
-    
+
     # Assert
     assert processing_time < timeout_limit
     assert len(result) > 0
@@ -337,11 +337,11 @@ def test_memory_usage_stays_within_limits():
     # Test memory consumption during processing
     import psutil
     process = psutil.Process()
-    
+
     initial_memory = process.memory_info().rss
     process_large_invoice('test_invoices/complex_invoice.pdf')
     peak_memory = process.memory_info().rss
-    
+
     # Should not exceed 1GB function limit
     assert (peak_memory - initial_memory) < 1024 * 1024 * 1024
 ```
@@ -359,7 +359,7 @@ Implement invoice processing tasks created by the Senior Engineer agent using TD
 
 ## Core Rules
 1. **ALWAYS** start with tests (RED phase)
-2. **NEVER** skip test implementation  
+2. **NEVER** skip test implementation
 3. **NEVER** hardcode vendor-specific values - use algorithmic patterns
 4. Follow the exact test structure provided by Senior Engineer
 5. Implement minimal code to pass tests (GREEN phase)
@@ -561,7 +561,7 @@ claude-code agent create senior-engineer \
 ### 2. Initialize Coding Agent (Sonnet 4)
 
 ```bash
-# Create coding agent  
+# Create coding agent
 claude-code agent create coding-agent \
   --model claude-sonnet-4-20250514 \
   --instructions .claude/agents/coding-agent/instructions.md \
@@ -575,7 +575,7 @@ claude-code agent create coding-agent \
 claude-code agent run senior-engineer \
   "Please analyze the phase document and create detailed TDD task breakdowns for invoice processing improvements. Focus on vendor-agnostic algorithmic patterns."
 
-# Coding Agent: Implement specific task  
+# Coding Agent: Implement specific task
 claude-code agent run coding-agent \
   "Please implement the task following TDD methodology, ensuring all processing is algorithmic and vendor-agnostic."
 

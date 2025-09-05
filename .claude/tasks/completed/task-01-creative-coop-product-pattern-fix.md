@@ -31,26 +31,26 @@ def test_xs_code_detection_fails_with_current_pattern():
     """Test that current D-code pattern fails to detect XS codes - RED test"""
     # Current pattern from main.py line 979
     current_pattern = r"\b(D[A-Z]\d{4}[A-Z]?)\b"
-    
+
     # Creative-Coop XS codes from CS003837319_Error 2.PDF
     xs_codes = ["XS9826A", "XS8911A", "XS9649A", "XS9482", "XS9840A", "XS8185", "XS9357", "XS7529"]
-    
+
     test_text = " ".join(xs_codes)
     matches = re.findall(current_pattern, test_text)
-    
+
     # RED: This should fail with current pattern
     assert len(matches) == 0, f"Current pattern should not match XS codes, but found: {matches}"
 
 def test_d_code_detection_works_with_current_pattern():
     """Test that current pattern correctly detects D codes"""
     current_pattern = r"\b(D[A-Z]\d{4}[A-Z]?)\b"
-    
+
     # Existing D codes from other vendors
     d_codes = ["DA1234A", "DB5678B", "DG9999C", "DH1111"]
-    
+
     test_text = " ".join(d_codes)
     matches = re.findall(current_pattern, test_text)
-    
+
     assert len(matches) == len(d_codes)
     assert set(matches) == set(d_codes)
 
@@ -58,35 +58,35 @@ def test_creative_coop_invoice_returns_zero_items_currently():
     """Test that Creative-Coop invoice currently returns 0 items - RED test"""
     # Load Creative-Coop test invoice Document AI output
     import json
-    
+
     with open('test_invoices/CS003837319_Error 2_docai_output.json', 'r') as f:
         doc_ai_output = json.load(f)
-    
+
     # Process with current implementation
     line_items = extract_line_items_from_entities(doc_ai_output)
-    
+
     # RED: Should fail - currently returns 0 items
     assert len(line_items) == 0, f"Creative-Coop should return 0 items currently, got: {len(line_items)}"
 
 def test_xs_code_extraction_from_entity_text():
     """Test XS code extraction from entity text fails with current pattern"""
     entity_text = "Product XS9826A Metal Ballerina Ornament UPC: 123456789012 Price: $8.50"
-    
+
     # Current pattern from line 2203
     current_pattern = r"\b(D[A-Z]\d{4}[A-Z]?)\b"
     product_codes = re.findall(current_pattern, entity_text)
-    
+
     # RED: Should find no matches with current pattern
     assert len(product_codes) == 0, f"Should find no XS codes with D-pattern, found: {product_codes}"
 
 def test_product_upc_pattern_fails_for_xs_codes():
     """Test product-UPC pattern extraction fails for XS codes"""
     line_text = "XS9826A 123456789012 Metal Ballerina Ornament"
-    
+
     # Current pattern from line 1780
     current_pattern = r"\b(D[A-Z]\d{4}[A-Z]?)\s+(\d{12})"
     matches = re.findall(current_pattern, line_text)
-    
+
     # RED: Should find no matches
     assert len(matches) == 0, f"Should find no XS-UPC pairs with D-pattern, found: {matches}"
 ```
@@ -98,10 +98,10 @@ Update the 5 regex patterns in main.py to support both D-codes and XS-codes:
 ```python
 # Location 1 - Line 979: extract_creative_coop_product_mappings_corrected
 # OLD: creative_coop_codes = re.findall(r"\b(D[A-Z]\d{4}[A-Z]?)\b", full_line_text)
-# NEW: 
+# NEW:
 creative_coop_codes = re.findall(r"\b((?:D[A-Z]\d{4}|XS\d+)[A-Z]?)\b", full_line_text)
 
-# Location 2 - Line 1780: extract_creative_coop_product_mappings_corrected  
+# Location 2 - Line 1780: extract_creative_coop_product_mappings_corrected
 # OLD: product_upc_pattern = r"\b(D[A-Z]\d{4}[A-Z]?)\s+(\d{12})"
 # NEW:
 product_upc_pattern = r"\b((?:D[A-Z]\d{4}|XS\d+)[A-Z]?)\s+(\d{12})"
@@ -156,7 +156,7 @@ def extract_creative_coop_product_upc_pairs(text):
 ## Engineering Principles Applied
 
 **Principle 1 - Testability**: Every pattern change is verified with specific test cases
-**Principle 2 - Maintainability**: Centralized pattern constants for easier future updates  
+**Principle 2 - Maintainability**: Centralized pattern constants for easier future updates
 **Principle 3 - Performance**: Optimized regex patterns to avoid backtracking
 **Principle 4 - Reliability**: Comprehensive edge case testing for malformed codes
 **Principle 5 - Backward Compatibility**: Preserves existing D-code functionality
@@ -203,6 +203,6 @@ def extract_creative_coop_product_upc_pairs(text):
 ## Dependencies
 
 - Document AI output for CS003837319_Error 2.PDF available
-- Test environment with Google Cloud credentials configured  
+- Test environment with Google Cloud credentials configured
 - Existing vendor test invoices for regression testing
 - Performance monitoring baseline established

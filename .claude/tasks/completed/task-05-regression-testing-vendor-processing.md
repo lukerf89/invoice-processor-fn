@@ -28,7 +28,7 @@ from unittest.mock import patch, MagicMock
 # Import vendor-specific processing functions
 from main import (
     process_harpercollins_document,
-    process_onehundred80_document, 
+    process_onehundred80_document,
     detect_vendor_type,
     extract_line_items_from_entities,
     process_creative_coop_document
@@ -36,7 +36,7 @@ from main import (
 
 class TestVendorRegressionBaselines:
     """Establish accuracy baselines for all vendor processing"""
-    
+
     @pytest.fixture
     def harpercollins_test_data(self):
         """Load HarperCollins test data"""
@@ -45,29 +45,29 @@ class TestVendorRegressionBaselines:
             'test_invoices/HarperCollins_PO_docai_output.json',
             'test_invoices/anne_mcgilvray_harpercollins_docai_output.json'
         ]
-        
+
         for test_file in test_files:
             if os.path.exists(test_file):
                 with open(test_file, 'r') as f:
                     return json.load(f)
-        
+
         pytest.skip("No HarperCollins test data available")
-    
-    @pytest.fixture 
+
+    @pytest.fixture
     def onehundred80_test_data(self):
         """Load OneHundred80 test data"""
         test_files = [
             'test_invoices/OneHundred80_docai_output.json',
             'test_invoices/onehundred80_test_docai_output.json'
         ]
-        
+
         for test_file in test_files:
             if os.path.exists(test_file):
                 with open(test_file, 'r') as f:
                     return json.load(f)
-        
+
         pytest.skip("No OneHundred80 test data available")
-    
+
     @pytest.fixture
     def rifle_paper_test_data(self):
         """Load Rifle Paper test data"""
@@ -75,12 +75,12 @@ class TestVendorRegressionBaselines:
             'test_invoices/Rifle_Paper_INV_J7XM9XQ3HB_docai_output.json',
             'test_invoices/rifle_paper_docai_output.json'
         ]
-        
+
         for test_file in test_files:
             if os.path.exists(test_file):
                 with open(test_file, 'r') as f:
                     return json.load(f)
-        
+
         pytest.skip("No Rifle Paper test data available")
 
     def test_harpercollins_baseline_accuracy(self, harpercollins_test_data):
@@ -90,89 +90,89 @@ class TestVendorRegressionBaselines:
             # Expected format: [Order Date, Vendor, INV/PO, Item (ISBN; Title), Wholesale, Qty]
             # This should be populated with actual expected results from perfect_processing.py
         ]
-        
+
         # Process with current implementation
         line_items = process_harpercollins_document(harpercollins_test_data)
-        
+
         # RED: Document current performance as baseline
         baseline_count = len(line_items)
-        
+
         # Verify processing produces results
         assert baseline_count > 0, f"HarperCollins baseline should produce items, got {baseline_count}"
-        
+
         # Document baseline for comparison
         print(f"HarperCollins baseline: {baseline_count} items extracted")
-        
+
         # Validate format consistency
         for i, item in enumerate(line_items):
             assert len(item) == 6, f"HarperCollins item {i} should have 6 columns, got {len(item)}: {item}"
-        
+
         return baseline_count
-    
+
     def test_onehundred80_baseline_accuracy(self, onehundred80_test_data):
         """RED: Establish OneHundred80 baseline accuracy"""
         # Process with current implementation
         line_items = process_onehundred80_document(onehundred80_test_data)
-        
+
         baseline_count = len(line_items)
-        
+
         # Verify processing produces results
         assert baseline_count > 0, f"OneHundred80 baseline should produce items, got {baseline_count}"
-        
+
         print(f"OneHundred80 baseline: {baseline_count} items extracted")
-        
+
         # Validate format
         for i, item in enumerate(line_items):
             assert len(item) == 6, f"OneHundred80 item {i} should have 6 columns, got {len(item)}: {item}"
-        
+
         return baseline_count
-    
+
     def test_rifle_paper_baseline_accuracy(self, rifle_paper_test_data):
         """RED: Establish Rifle Paper baseline accuracy"""
         # Rifle Paper uses generic processing
         line_items = extract_line_items_from_entities(rifle_paper_test_data)
-        
+
         baseline_count = len(line_items)
-        
+
         # Verify processing produces results
         assert baseline_count > 0, f"Rifle Paper baseline should produce items, got {baseline_count}"
-        
+
         print(f"Rifle Paper baseline: {baseline_count} items extracted")
-        
+
         # Validate format
         for i, item in enumerate(line_items):
             assert len(item) == 6, f"Rifle Paper item {i} should have 6 columns, got {len(item)}: {item}"
-        
+
         return baseline_count
-    
+
     def test_vendor_detection_baselines(self, harpercollins_test_data, onehundred80_test_data):
         """RED: Test vendor detection accuracy baselines"""
-        
+
         # Test HarperCollins detection
         hc_vendor = detect_vendor_type(harpercollins_test_data)
         assert 'harper' in hc_vendor['vendor'].lower(), f"Should detect HarperCollins, got {hc_vendor['vendor']}"
-        
-        # Test OneHundred80 detection  
+
+        # Test OneHundred80 detection
         oh80_vendor = detect_vendor_type(onehundred80_test_data)
         assert 'onehundred80' in oh80_vendor['vendor'].lower(), f"Should detect OneHundred80, got {oh80_vendor['vendor']}"
-        
+
         print(f"Vendor detection baselines:")
         print(f"  HarperCollins: {hc_vendor['vendor']} (confidence: {hc_vendor['confidence']:.2f})")
         print(f"  OneHundred80: {oh80_vendor['vendor']} (confidence: {oh80_vendor['confidence']:.2f})")
-    
+
     def test_d_code_pattern_still_works_for_existing_vendors(self):
         """RED: Test that D-code patterns work with test data"""
         import re
-        
+
         # Test current D-code pattern
         current_pattern = r"\b(D[A-Z]\d{4}[A-Z]?)\b"
-        
+
         # Sample D-codes from existing vendors (if any)
         test_d_codes = ["DA1234A", "DB5678B", "DG9999C", "DH1111"]
-        
+
         test_text = " ".join(test_d_codes)
         matches = re.findall(current_pattern, test_text)
-        
+
         # Should match all D-codes
         assert len(matches) == len(test_d_codes), f"D-pattern should match all D-codes, got {len(matches)}/{len(test_d_codes)}"
         assert set(matches) == set(test_d_codes), f"Matches don't match expected: {matches} vs {test_d_codes}"
@@ -185,92 +185,92 @@ class TestVendorRegressionBaselines:
 
     def test_harpercollins_accuracy_maintained_after_pattern_fix(self, harpercollins_test_data):
         """GREEN: Verify HarperCollins processing unchanged after XS-code pattern fix"""
-        
+
         # Get baseline from previous test
         baseline_items = process_harpercollins_document(harpercollins_test_data)
         baseline_count = len(baseline_items)
-        
+
         # After pattern fix, should produce identical results
         post_fix_items = process_harpercollins_document(harpercollins_test_data)
         post_fix_count = len(post_fix_items)
-        
+
         # GREEN: Should maintain exact same accuracy
         assert post_fix_count == baseline_count, f"HarperCollins regression: {baseline_count} → {post_fix_count} items"
-        
+
         # Verify item content hasn't changed
         for i, (baseline_item, post_fix_item) in enumerate(zip(baseline_items, post_fix_items)):
             assert baseline_item == post_fix_item, f"HarperCollins item {i} changed: {baseline_item} → {post_fix_item}"
-        
+
         print(f"HarperCollins: ✅ No regression ({post_fix_count} items)")
-    
+
     def test_onehundred80_accuracy_maintained_after_pattern_fix(self, onehundred80_test_data):
         """GREEN: Verify OneHundred80 processing unchanged after XS-code pattern fix"""
-        
+
         # Similar test for OneHundred80
         baseline_items = process_onehundred80_document(onehundred80_test_data)
         baseline_count = len(baseline_items)
-        
+
         post_fix_items = process_onehundred80_document(onehundred80_test_data)
         post_fix_count = len(post_fix_items)
-        
+
         assert post_fix_count == baseline_count, f"OneHundred80 regression: {baseline_count} → {post_fix_count} items"
-        
+
         print(f"OneHundred80: ✅ No regression ({post_fix_count} items)")
-    
+
     def test_rifle_paper_accuracy_maintained_after_pattern_fix(self, rifle_paper_test_data):
         """GREEN: Verify Rifle Paper processing unchanged after XS-code pattern fix"""
-        
+
         baseline_items = extract_line_items_from_entities(rifle_paper_test_data)
         baseline_count = len(baseline_items)
-        
+
         post_fix_items = extract_line_items_from_entities(rifle_paper_test_data)
         post_fix_count = len(post_fix_items)
-        
+
         assert post_fix_count == baseline_count, f"Rifle Paper regression: {baseline_count} → {post_fix_count} items"
-        
+
         print(f"Rifle Paper: ✅ No regression ({post_fix_count} items)")
-    
+
     def test_vendor_detection_unchanged_after_pattern_fix(self, harpercollins_test_data, onehundred80_test_data):
         """GREEN: Verify vendor detection unchanged after pattern fix"""
-        
+
         # Vendor detection shouldn't be affected by product code patterns
         hc_vendor = detect_vendor_type(harpercollins_test_data)
         oh80_vendor = detect_vendor_type(onehundred80_test_data)
-        
+
         assert 'harper' in hc_vendor['vendor'].lower()
         assert 'onehundred80' in oh80_vendor['vendor'].lower()
-        
+
         print(f"Vendor detection: ✅ No regression")
-    
+
     def test_updated_pattern_still_matches_d_codes(self):
         """GREEN: Test that updated pattern still matches existing D-codes"""
         # Updated pattern that includes XS codes
         updated_pattern = r"\b((?:D[A-Z]\d{4}|XS\d+)[A-Z]?)\b"
-        
+
         # Test D-codes still work
         test_d_codes = ["DA1234A", "DB5678B", "DG9999C", "DH1111"]
         test_text = " ".join(test_d_codes)
-        
+
         matches = re.findall(updated_pattern, test_text)
-        
+
         assert len(matches) == len(test_d_codes), f"Updated pattern should match D-codes, got {len(matches)}/{len(test_d_codes)}"
         assert set(matches) == set(test_d_codes), f"D-code matches incorrect: {matches} vs {test_d_codes}"
-        
+
         print(f"D-code pattern: ✅ Still works with updated pattern")
-    
+
     def test_updated_pattern_now_matches_xs_codes(self):
         """GREEN: Test that updated pattern now matches XS-codes"""
         updated_pattern = r"\b((?:D[A-Z]\d{4}|XS\d+)[A-Z]?)\b"
-        
+
         # Test XS-codes now work
         test_xs_codes = ["XS9826A", "XS8911A", "XS9649A", "XS9482", "XS9840A"]
         test_text = " ".join(test_xs_codes)
-        
+
         matches = re.findall(updated_pattern, test_text)
-        
+
         assert len(matches) == len(test_xs_codes), f"Updated pattern should match XS-codes, got {len(matches)}/{len(test_xs_codes)}"
         assert set(matches) == set(test_xs_codes), f"XS-code matches incorrect: {matches} vs {test_xs_codes}"
-        
+
         print(f"XS-code pattern: ✅ Now works with updated pattern")
 ```
 
@@ -283,29 +283,29 @@ Create comprehensive automated regression testing:
 
 class VendorRegressionTestSuite:
     """Automated regression test suite for vendor processing"""
-    
+
     def __init__(self):
         self.test_results = {}
         self.baselines = {}
-    
+
     def run_full_regression_suite(self):
         """Run complete regression test suite for all vendors"""
-        
+
         vendors = ['harpercollins', 'onehundred80', 'rifle_paper', 'creative_coop']
-        
+
         print("🧪 Running Full Vendor Regression Test Suite")
         print("=" * 50)
-        
+
         for vendor in vendors:
             try:
                 result = self.test_vendor_regression(vendor)
                 self.test_results[vendor] = result
-                
+
                 if result['passed']:
                     print(f"✅ {vendor}: PASSED ({result['items']} items)")
                 else:
                     print(f"❌ {vendor}: FAILED - {result['error']}")
-                    
+
             except Exception as e:
                 self.test_results[vendor] = {
                     'passed': False,
@@ -313,18 +313,18 @@ class VendorRegressionTestSuite:
                     'items': 0
                 }
                 print(f"❌ {vendor}: ERROR - {str(e)}")
-        
+
         return self.generate_regression_report()
-    
+
     def test_vendor_regression(self, vendor_name):
         """Test regression for specific vendor"""
-        
+
         # Load test data for vendor
         test_data = self.load_vendor_test_data(vendor_name)
-        
+
         if not test_data:
             return {'passed': False, 'error': 'No test data available', 'items': 0}
-        
+
         try:
             # Process with vendor-specific function
             if vendor_name == 'harpercollins':
@@ -335,49 +335,49 @@ class VendorRegressionTestSuite:
                 line_items = process_creative_coop_document(test_data)
             else:
                 line_items = extract_line_items_from_entities(test_data)
-            
+
             # Validate format
             for item in line_items:
                 if len(item) != 6:
                     raise ValueError(f"Invalid format: {len(item)} columns instead of 6")
-            
+
             return {
                 'passed': True,
                 'items': len(line_items),
                 'error': None
             }
-            
+
         except Exception as e:
             return {
                 'passed': False,
                 'items': 0,
                 'error': str(e)
             }
-    
+
     def load_vendor_test_data(self, vendor_name):
         """Load test data for specific vendor"""
-        
+
         test_file_map = {
             'harpercollins': ['test_invoices/HarperCollins_PO_docai_output.json'],
             'onehundred80': ['test_invoices/OneHundred80_docai_output.json'],
             'rifle_paper': ['test_invoices/Rifle_Paper_INV_J7XM9XQ3HB_docai_output.json'],
             'creative_coop': ['test_invoices/CS003837319_Error 2_docai_output.json']
         }
-        
+
         for test_file in test_file_map.get(vendor_name, []):
             if os.path.exists(test_file):
                 with open(test_file, 'r') as f:
                     return json.load(f)
-        
+
         return None
-    
+
     def generate_regression_report(self):
         """Generate comprehensive regression test report"""
-        
+
         total_vendors = len(self.test_results)
         passed_vendors = sum(1 for r in self.test_results.values() if r['passed'])
         failed_vendors = total_vendors - passed_vendors
-        
+
         report = {
             'summary': {
                 'total_vendors': total_vendors,
@@ -388,50 +388,50 @@ class VendorRegressionTestSuite:
             'details': self.test_results,
             'recommendations': []
         }
-        
+
         # Add recommendations based on results
         if failed_vendors > 0:
             report['recommendations'].append("⚠️ Some vendors failed regression testing - investigate before deployment")
-        
+
         if report['summary']['pass_rate'] < 100:
             report['recommendations'].append("🔍 Review failed vendors and fix issues before proceeding")
         else:
             report['recommendations'].append("✅ All vendors passed - safe to deploy XS-code pattern fix")
-        
+
         return report
 
 # Performance comparison utility
 def compare_processing_performance():
     """Compare processing performance before and after pattern changes"""
-    
+
     import time
-    
+
     performance_results = {}
-    
+
     # Test each vendor processing time
     test_suite = VendorRegressionTestSuite()
-    
+
     for vendor in ['harpercollins', 'onehundred80', 'rifle_paper']:
         test_data = test_suite.load_vendor_test_data(vendor)
-        
+
         if test_data:
             start_time = time.time()
-            
+
             if vendor == 'harpercollins':
                 line_items = process_harpercollins_document(test_data)
             elif vendor == 'onehundred80':
                 line_items = process_onehundred80_document(test_data)
             else:
                 line_items = extract_line_items_from_entities(test_data)
-            
+
             end_time = time.time()
-            
+
             performance_results[vendor] = {
                 'processing_time': end_time - start_time,
                 'items_processed': len(line_items),
                 'items_per_second': len(line_items) / max(end_time - start_time, 0.001)
             }
-    
+
     return performance_results
 ```
 
@@ -440,7 +440,7 @@ def compare_processing_performance():
 - [ ] Baseline accuracy established for all existing vendors (HarperCollins, OneHundred80, Rifle Paper)
 - [ ] HarperCollins maintains 100% processing accuracy after XS-code pattern changes
 - [ ] OneHundred80 processing accuracy unchanged after pattern modifications
-- [ ] Rifle Paper processing maintains baseline accuracy levels  
+- [ ] Rifle Paper processing maintains baseline accuracy levels
 - [ ] Vendor detection continues working correctly for all vendor types
 - [ ] D-code pattern matching still works for existing vendors using D-codes
 - [ ] XS-code pattern matching now works for Creative-Coop without affecting others
@@ -488,7 +488,7 @@ def compare_processing_performance():
 - **Mitigation**: Comprehensive baseline testing, careful pattern modification
 - **Detection**: Automated regression test suite, before/after comparison
 
-**Medium Risk**: Performance degradation from updated regex patterns  
+**Medium Risk**: Performance degradation from updated regex patterns
 - **Mitigation**: Performance benchmarking, pattern optimization
 - **Detection**: Processing time monitoring, timeout alerts
 

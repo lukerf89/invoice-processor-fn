@@ -22,11 +22,11 @@
 4. **Knowledge Management** - Vendor pattern documentation, team expertise, troubleshooting guides, skill transfer
 
 ## Risk Scoring for Invoice Processing
-- **Probability**: 
+- **Probability**:
   - Low (10% - rare occurrence): Happens less than once per quarter
-  - Medium (30% - periodic): Happens monthly or quarterly  
+  - Medium (30% - periodic): Happens monthly or quarterly
   - High (60% - frequent): Happens weekly or more often
-- **Impact**: 
+- **Impact**:
   - Low (minor delay): < 1 day delay, minimal manual work
   - Medium (processing degradation): 1-3 days delay, significant manual intervention
   - High (system failure): > 3 days delay, major business disruption
@@ -47,7 +47,7 @@
    - **Mitigation**: Multi-tier fallback system with text parsing, service health monitoring
    - **Contingency**: Manual processing workflow, alternative OCR services
 
-2. **New Vendor Invoice Format** (High probability 60%, Medium impact 20 = Score 12) 
+2. **New Vendor Invoice Format** (High probability 60%, Medium impact 20 = Score 12)
    - **Description**: Existing vendor changes invoice format, breaking pattern recognition
    - **Mitigation**: Pattern monitoring, regular accuracy validation, flexible algorithmic patterns
    - **Contingency**: Rapid pattern development, temporary manual review
@@ -114,7 +114,7 @@
 ## Risk Response Procedures
 
 ### Immediate Response (< 15 minutes)
-1. **Service Outage Detected**: 
+1. **Service Outage Detected**:
    - Activate fallback processing tier
    - Notify stakeholders via automated alert
    - Begin service status investigation

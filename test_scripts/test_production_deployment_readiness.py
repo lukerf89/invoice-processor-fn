@@ -655,13 +655,13 @@ def create_mixed_format_document():
     """Create mixed format document for testing"""
     mixed_text = """
     Creative-Coop Mixed Invoice
-    
+
     Tabular section:
     XS9826A | 191009727774 | Product | 24 | 0 | 0 | 24 | each | 2.00 | 1.60 | 38.40
-    
+
     Pattern section:
     DF6802 Vase 8 0 Set $12.50 $100.00
-    
+
     Context section:
     ST1234: Cotton Throw
     Price: $8.00 wholesale

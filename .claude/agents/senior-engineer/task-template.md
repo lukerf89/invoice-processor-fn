@@ -36,10 +36,10 @@ def test_[component]_processes_[scenario]_successfully():
     # Arrange
     test_data = load_test_fixture('test_invoices/sample.pdf')
     expected_result = [expected_output]
-    
+
     # Act
     result = [function_under_test](test_data)
-    
+
     # Assert
     assert result == expected_result
     assert len(result) > 0
@@ -67,13 +67,13 @@ def test_handles_[edge_case]_correctly():
 def [function_name](input_data):
     """
     [Function description]
-    
+
     Args:
         input_data: [Description]
-        
+
     Returns:
         [Description]
-        
+
     Raises:
         [Exception types and conditions]
     """
@@ -85,7 +85,7 @@ def [function_name](input_data):
 
 **Refactoring Focus**:
 - [ ] Extract reusable utility functions
-- [ ] Optimize performance 
+- [ ] Optimize performance
 - [ ] Improve error handling
 - [ ] Add comprehensive logging
 - [ ] Enhance code documentation
@@ -120,7 +120,7 @@ logger.info("[Task] completed successfully", extra={
     'items_processed': count
 })
 
-# Error case  
+# Error case
 logger.error("[Task] failed", extra={
     'correlation_id': correlation_id,
     'error_type': error.__class__.__name__,

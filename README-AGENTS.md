@@ -29,7 +29,7 @@ This repository includes a complete 4-agent development pipeline for invoice pro
 
 You should see 4 agents:
 - `product-manager` (orange) - Creates PRDs from business requirements
-- `technical-pm` (blue) - Creates phase documents from PRDs  
+- `technical-pm` (blue) - Creates phase documents from PRDs
 - `senior-engineer` (green) - Creates TDD tasks from phase documents
 - `coding-agent` (purple) - Implements tasks with algorithmic patterns
 
@@ -60,7 +60,7 @@ claude-code agent run coding-agent \
 claude-code agent run product-manager \
   "We need to improve Creative-Coop processing accuracy from 75% to 90%"
 
-# Add new vendor support  
+# Add new vendor support
 claude-code agent run product-manager \
   "We need to add support for [VendorName] invoices"
 
@@ -77,7 +77,7 @@ claude-code agent run product-manager \
 - **Output**: Comprehensive PRDs with success criteria
 - **Maintains**: Product backlog and roadmap
 
-### Technical PM Agent 🔵  
+### Technical PM Agent 🔵
 - **Purpose**: PRDs → Phase documents
 - **Input**: Product requirements documents
 - **Output**: Detailed implementation phases with risk assessment
@@ -86,7 +86,7 @@ claude-code agent run product-manager \
 ### Senior Engineer Agent 🟢
 - **Purpose**: Phase documents → TDD tasks
 - **Input**: Implementation phase plans
-- **Output**: Atomic tasks with comprehensive test specifications  
+- **Output**: Atomic tasks with comprehensive test specifications
 - **Ensures**: Algorithmic patterns, engineering best practices
 
 ### Coding Agent 🟣
@@ -120,13 +120,13 @@ claude-code agent create [agent-name] --instructions .claude/agents/[agent-name]
 ```
 .claude/agents/           # Agent configuration files
 ├── product-manager.md    # PM agent configuration
-├── technical-pm.md       # Technical PM configuration  
+├── technical-pm.md       # Technical PM configuration
 ├── senior-engineer.md    # Senior engineer configuration
 └── coding-agent.md       # Coding agent configuration
 
 docs/
 ├── prds/                 # Generated PRDs
-├── phases/               # Generated phase documents  
+├── phases/               # Generated phase documents
 └── SETUP - *.md          # Detailed setup guides
 ```
 

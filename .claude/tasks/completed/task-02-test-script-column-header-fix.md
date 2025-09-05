@@ -37,7 +37,7 @@ def test_current_scripts_have_column_a_mismatch():
     """RED: Test that current scripts include Column A but only write 6 data columns"""
     test_scripts_with_column_a = [
         "test_scripts/test_onehundred80.py",
-        "test_scripts/test_final_creative_coop.py", 
+        "test_scripts/test_final_creative_coop.py",
         "test_scripts/test_rifle_improved.py",
         "test_scripts/test_integrated_creative_coop.py",
         "test_scripts/final_creative_coop_processing.py",
@@ -51,16 +51,16 @@ def test_current_scripts_have_column_a_mismatch():
         "test_scripts/improved_processing_v2.py",
         "test_scripts/improved_processing.py"
     ]
-    
+
     column_a_found = []
-    
+
     for script_path in test_scripts_with_column_a:
         if os.path.exists(script_path):
             with open(script_path, 'r') as f:
                 content = f.read()
                 if '"Column A"' in content or "'Column A'" in content:
                     column_a_found.append(script_path)
-    
+
     # RED: This should fail initially - scripts contain Column A references
     assert len(column_a_found) > 0, f"Expected scripts with Column A, found none in: {test_scripts_with_column_a}"
 
@@ -71,7 +71,7 @@ def test_main_py_outputs_six_columns():
         ["2023-01-15", "Creative-Coop", "INV001", "XS9826A; Metal Ballerina", "8.50", "12"],
         ["2023-01-15", "Creative-Coop", "INV001", "XS8911A; Metal Item", "12.00", "6"],
     ]
-    
+
     # Verify each row has exactly 6 columns
     for row in sample_line_items:
         assert len(row) == 6, f"Main.py output should have 6 columns, row has {len(row)}: {row}"
@@ -81,10 +81,10 @@ def test_header_column_count_mismatch():
     # This will fail initially - demonstrating the mismatch
     headers_with_column_a = ["Column A", "Order Date", "Vendor", "INV", "Item", "Wholesale", "Qty ordered"]
     sample_data_row = ["2023-01-15", "Creative-Coop", "INV001", "XS9826A; Metal Ballerina", "8.50", "12"]
-    
+
     assert len(headers_with_column_a) == 7
     assert len(sample_data_row) == 6
-    
+
     # RED: This should fail - header count doesn't match data count
     assert len(headers_with_column_a) != len(sample_data_row), "Headers and data have mismatched column counts"
 
@@ -95,22 +95,22 @@ def test_csv_output_alignment_issues():
         ["2023-01-15", "Creative-Coop", "INV001", "XS9826A; Metal Ballerina", "8.50", "12"],
         ["2023-01-15", "Creative-Coop", "INV001", "XS8911A; Metal Item", "12.00", "6"],
     ]
-    
+
     # Create CSV with mismatched headers/data
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(headers_with_column_a)
     writer.writerows(sample_data)
     csv_content = output.getvalue()
-    
+
     # RED: This should show misalignment
     lines = csv_content.strip().split('\n')
     header_line = lines[0]
     data_line = lines[1]
-    
+
     header_columns = len(header_line.split(','))
     data_columns = len(data_line.split(','))
-    
+
     assert header_columns != data_columns, f"CSV has misaligned headers ({header_columns}) and data ({data_columns})"
 ```
 
@@ -150,20 +150,20 @@ def validate_csv_format(csv_file_path):
     with open(csv_file_path, 'r') as f:
         reader = csv.reader(f)
         headers = next(reader)
-        
+
         # Validate header count
         if len(headers) != EXPECTED_COLUMN_COUNT:
             raise ValueError(f"Expected {EXPECTED_COLUMN_COUNT} columns, got {len(headers)}: {headers}")
-        
+
         # Validate header content
         if headers != GOOGLE_SHEETS_HEADERS:
             raise ValueError(f"Headers don't match expected format. Got: {headers}")
-        
+
         # Validate all data rows have correct column count
         for row_num, row in enumerate(reader, start=2):
             if len(row) != EXPECTED_COLUMN_COUNT:
                 raise ValueError(f"Row {row_num} has {len(row)} columns, expected {EXPECTED_COLUMN_COUNT}: {row}")
-    
+
     return True
 
 def write_standardized_csv(file_path, line_items):
@@ -171,7 +171,7 @@ def write_standardized_csv(file_path, line_items):
     with open(file_path, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(GOOGLE_SHEETS_HEADERS)
-        
+
         for item in line_items:
             if len(item) != EXPECTED_COLUMN_COUNT:
                 raise ValueError(f"Line item has {len(item)} columns, expected {EXPECTED_COLUMN_COUNT}: {item}")
@@ -238,7 +238,7 @@ test_scripts/improved_processing.py
 ## Success Metrics
 
 - **Visual Alignment**: Test output matches Google Sheets format exactly
-- **Consistency**: 100% of test scripts use standardized 6-column format  
+- **Consistency**: 100% of test scripts use standardized 6-column format
 - **Validation**: Automated CSV format validation catches issues
 - **Stakeholder Experience**: No confusion about column alignment during reviews
 - **Maintenance**: Centralized header management prevents future inconsistencies

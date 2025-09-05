@@ -81,7 +81,7 @@ IMPORTANT RULES:
 
 {
   "order_date": "MM/DD/YYYY",
-  "vendor": "Vendor Business Name", 
+  "vendor": "Vendor Business Name",
   "invoice_number": "Invoice/Order Number",
   "line_items": [
     {

@@ -15,16 +15,16 @@ Deploy two separate Cloud Functions that Zapier calls sequentially:
 **Purpose**: Quick Gemini AI processing with aggressive timeout
 - **Timeout**: 30-45 seconds max
 - **Memory**: 512MB (lighter footprint)
-- **Behavior**: 
+- **Behavior**:
   - Try Gemini AI with short timeout
   - Return success or explicit failure (no fallback)
   - Optimized for speed over reliability
 
-### Function 2: process-invoice-fallback  
+### Function 2: process-invoice-fallback
 **Purpose**: Reliable Document AI processing (current system)
 - **Timeout**: 540 seconds (current)
-- **Memory**: 1GB (current)  
-- **Behavior**: 
+- **Memory**: 1GB (current)
+- **Behavior**:
   - Skip Gemini entirely
   - Use proven Document AI + vendor-specific processing
   - Guaranteed to work within Zapier limits
@@ -35,7 +35,7 @@ Deploy two separate Cloud Functions that Zapier calls sequentially:
    ├─ Success (HTTP 200) → DONE ✅
    └─ Failure/Timeout → Continue to Step 2
 
-2. POST to process-invoice-fallback  
+2. POST to process-invoice-fallback
    ├─ Success (HTTP 200) → DONE ✅
    └─ Failure → Log error ❌
 ```
@@ -71,46 +71,46 @@ from googleapiclient.discovery import build
 @functions_framework.http
 def process_invoice_gemini(request: Request):
     """Gemini-only invoice processing with aggressive timeout"""
-    
+
     # Same file handling as original...
-    
+
     # GEMINI PROCESSING ONLY - NO FALLBACKS
     start_time = time.time()
-    
+
     try:
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             return jsonify({"success": False, "error": "Gemini API key not found"}), 500
-            
+
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel("gemini-1.5-pro")
-        
+
         # Aggressive timeout - fail fast
         response = model.generate_content([
             prompt,
             {"mime_type": "application/pdf", "data": pdf_content}
         ])
-        
+
         processing_time = time.time() - start_time
-        
+
         # Hard timeout check - fail if too slow
         if processing_time > 30:
             return jsonify({
-                "success": False, 
+                "success": False,
                 "error": f"Gemini timeout: {processing_time:.1f}s > 30s limit",
                 "processing_time": processing_time
             }), 408  # Request Timeout
-        
+
         # Process Gemini response...
         # Write to Google Sheets...
-        
+
         return jsonify({
             "success": True,
             "method": "gemini",
             "processing_time": processing_time,
             "items_processed": len(rows)
         })
-        
+
     except Exception as e:
         processing_time = time.time() - start_time
         return jsonify({
@@ -173,18 +173,18 @@ def process_with_gemini_first(pdf_content):
     """REMOVED - No Gemini in fallback function"""
     return None
 
-@functions_framework.http  
+@functions_framework.http
 def process_invoice(request: Request):
     """Document AI only - reliable fallback processing"""
-    
+
     # Skip Gemini entirely - go straight to Document AI
     print("📄 Using Document AI processing (fallback function)")
-    
+
     # ... rest of Document AI processing ...
-    
+
     return jsonify({
         "success": True,
-        "method": "document_ai_fallback", 
+        "method": "document_ai_fallback",
         "vendor": vendor,
         "items_processed": len(rows)
     })
@@ -204,7 +204,7 @@ Body: {"file_url": "{{invoice_url}}"}
 #### Step 3.2: Configure Fallback Webhook (Error Handler)
 ```
 Trigger: Only if first webhook fails/times out
-URL: https://us-central1-freckled-hen-analytics.cloudfunctions.net/process-invoice-fallback  
+URL: https://us-central1-freckled-hen-analytics.cloudfunctions.net/process-invoice-fallback
 Method: POST
 Timeout: 160 seconds
 Headers: Content-Type: application/json
@@ -216,7 +216,7 @@ Body: {"file_url": "{{invoice_url}}"}
 1. Try Gemini Function
    ├─ HTTP 200 + "success": true → DONE ✅
    ├─ HTTP 408 (timeout) → Continue to Fallback
-   ├─ HTTP 500 (error) → Continue to Fallback  
+   ├─ HTTP 500 (error) → Continue to Fallback
    └─ No response (timeout) → Continue to Fallback
 
 2. Try Fallback Function
@@ -234,7 +234,7 @@ curl -X POST "https://us-central1-freckled-hen-analytics.cloudfunctions.net/proc
   -d '{"file_url": "https://example.com/simple-invoice.pdf"}' \
   --max-time 45
 
-# Test fallback function with complex invoice  
+# Test fallback function with complex invoice
 curl -X POST "https://us-central1-freckled-hen-analytics.cloudfunctions.net/process-invoice-fallback" \
   -H "Content-Type: application/json" \
   -d '{"file_url": "https://example.com/complex-invoice.pdf"}' \
@@ -268,7 +268,7 @@ print(f"📊 METRICS: {json.dumps(log_data)}")
 ```bash
 # Query logs to track success rates
 gcloud logging read "resource.type=cloud_function AND (
-    resource.labels.function_name=process-invoice-gemini OR 
+    resource.labels.function_name=process-invoice-gemini OR
     resource.labels.function_name=process-invoice-fallback
 ) AND textPayload:METRICS" \
     --format="csv(timestamp,resource.labels.function_name,textPayload)" \
@@ -282,7 +282,7 @@ gcloud logging read "resource.type=cloud_function AND (
 - ✅ Best of both worlds: fast Gemini + reliable Document AI
 - ✅ No single point of failure
 
-### Performance  
+### Performance
 - ✅ Fast invoices get Gemini speed/accuracy
 - ✅ Complex invoices get Document AI reliability
 - ✅ Independent scaling for each approach
@@ -309,7 +309,7 @@ gcloud functions deploy process-invoice-gemini \
     --set-secrets="GEMINI_API_KEY=gemini-api-key:latest"
 ```
 
-### process-invoice-fallback  
+### process-invoice-fallback
 ```bash
 gcloud functions deploy process-invoice-fallback \
     --gen2 \
@@ -349,9 +349,9 @@ Could add logic to determine which function to try first based on:
 - [ ] Add aggressive timeout logic
 - [ ] Test Gemini function locally
 
-### Week 2: Deployment (2-3 hours)  
+### Week 2: Deployment (2-3 hours)
 - [ ] Deploy process-invoice-gemini function
-- [ ] Deploy process-invoice-fallback function  
+- [ ] Deploy process-invoice-fallback function
 - [ ] Test both functions independently
 - [ ] Verify Google Sheets integration works for both
 
@@ -374,7 +374,7 @@ Could add logic to determine which function to try first based on:
 - **Compute**: Full processing regardless of complexity
 - **Document AI**: Always used (after Gemini timeout)
 
-### Two-Tier Function Cost  
+### Two-Tier Function Cost
 - **Simple invoices**: 512MB × 10-30s (Gemini only) = **60-70% cost reduction**
 - **Complex invoices**: 512MB × 30s + 1GB × 60s = **Similar cost**
 - **Document AI**: Only used when Gemini fails = **Potential 40-50% reduction**
@@ -393,7 +393,7 @@ Could add logic to determine which function to try first based on:
 - **Cost optimization**: Monitor billing during first month
 - **Monitoring setup**: Need proper alerting for failures
 
-### Low Risk Items  
+### Low Risk Items
 - **Code functionality**: Based on proven existing code
 - **Google Sheets integration**: Already working
 - **Authentication**: Uses existing service accounts
@@ -402,7 +402,7 @@ Could add logic to determine which function to try first based on:
 
 ### Primary Goals (Must Achieve)
 - [ ] **Zero Zapier timeouts** with two-tier approach
-- [ ] **>95% processing success rate** across all invoice types  
+- [ ] **>95% processing success rate** across all invoice types
 - [ ] **Faster processing** for simple invoices (Gemini)
 - [ ] **Reliable fallback** for complex invoices
 
@@ -417,7 +417,7 @@ Could add logic to determine which function to try first based on:
 ### Emergency Rollback (if critical issues)
 ```bash
 # Immediate: Point Zapier back to current working function
-# Update Zapier webhook URL to: 
+# Update Zapier webhook URL to:
 https://us-central1-freckled-hen-analytics.cloudfunctions.net/process_invoice
 
 # This restores full functionality within 5 minutes
@@ -426,7 +426,7 @@ https://us-central1-freckled-hen-analytics.cloudfunctions.net/process_invoice
 ### Graceful Rollback (if optimization needed)
 1. **Keep both functions running**
 2. **Gradually shift traffic** back to single function
-3. **Analyze what went wrong** using logs and metrics  
+3. **Analyze what went wrong** using logs and metrics
 4. **Fix issues** and re-attempt deployment
 5. **Delete unused functions** once satisfied with rollback
 
@@ -459,9 +459,9 @@ gcloud functions delete process-invoice-fallback --region=us-central1
 
 ---
 
-**Status**: Ready for Implementation  
-**Priority**: Medium-High (implement when ready to re-enable Gemini)  
-**Estimated Total Effort**: 8-12 hours over 4 weeks  
-**Estimated Monthly Savings**: $50-200  
-**Risk Level**: Medium (with proper testing)  
+**Status**: Ready for Implementation
+**Priority**: Medium-High (implement when ready to re-enable Gemini)
+**Estimated Total Effort**: 8-12 hours over 4 weeks
+**Estimated Monthly Savings**: $50-200
+**Risk Level**: Medium (with proper testing)
 **Rollback Time**: 5 minutes (emergency) / 1-2 hours (graceful)

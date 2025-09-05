@@ -69,13 +69,13 @@ Once agents are created, you can use convenient slash commands for faster develo
 
 **Descriptive Commands:**
 - `/product-manager` - Create comprehensive PRDs from business requirements
-- `/technical-pm` - Translate PRDs into executable phase documents  
+- `/technical-pm` - Translate PRDs into executable phase documents
 - `/senior-engineer` - Break down phases into atomic TDD tasks
 - `/coding-agent` - Implement TDD tasks using Red-Green-Refactor methodology
 
 **Short Commands (Aliases):**
 - `/pm` - Quick product-manager access
-- `/se` - Quick senior-engineer access  
+- `/se` - Quick senior-engineer access
 - `/ca` - Quick coding-agent access
 
 ### Usage Examples
@@ -98,7 +98,7 @@ Once agents are created, you can use convenient slash commands for faster develo
 
 The slash commands are automatically configured via files in `.claude/commands/`:
 - `.claude/commands/product-manager.md`
-- `.claude/commands/technical-pm.md`  
+- `.claude/commands/technical-pm.md`
 - `.claude/commands/senior-engineer.md`
 - `.claude/commands/coding-agent.md`
 - `.claude/commands/pm.md` (short version)
@@ -139,7 +139,7 @@ Ensure these files exist before running agent creation:
 
 ### Agent Configuration Files
 - `.claude/agents/technical-pm/instructions.md` ✅
-- `.claude/agents/technical-pm/phase-document-template.md` ✅  
+- `.claude/agents/technical-pm/phase-document-template.md` ✅
 - `.claude/agents/technical-pm/risk-assessment-framework.md` ✅
 - `.claude/agents/senior-engineer/instructions.md` ✅
 - `.claude/agents/senior-engineer/task-template.md` ✅
@@ -148,11 +148,11 @@ Ensure these files exist before running agent creation:
 
 ### Slash Command Files (Auto-configured)
 - `.claude/commands/product-manager.md` ✅ (Auto-created)
-- `.claude/commands/technical-pm.md` ✅ (Auto-created) 
+- `.claude/commands/technical-pm.md` ✅ (Auto-created)
 - `.claude/commands/senior-engineer.md` ✅ (Auto-created)
 - `.claude/commands/coding-agent.md` ✅ (Auto-created)
 - `.claude/commands/pm.md` ✅ (Short alias)
-- `.claude/commands/se.md` ✅ (Short alias) 
+- `.claude/commands/se.md` ✅ (Short alias)
 - `.claude/commands/ca.md` ✅ (Short alias)
 
 ### Documentation Files

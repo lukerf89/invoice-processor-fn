@@ -54,9 +54,15 @@ if vendor_type == "Creative-Coop":
     # Show results
     print(f"\n📋 Results (first 10 items):")
     for i, row in enumerate(rows[:10], 1):
-        print(
-            f"  {i:2d}: {row[4][:60]}{'...' if len(row[4]) > 60 else ''} | {row[5]} | Qty: {row[6]}"
-        )
+        if len(row) >= 6:
+            qty = row[5] if len(row) > 5 else "N/A"
+            price = row[4] if len(row) > 4 else "N/A"
+            description = row[3] if len(row) > 3 else "N/A"
+            print(
+                f"  {i:2d}: {description[:60]}{'...' if len(str(description)) > 60 else ''} | Price: ${price} | Qty: {qty}"
+            )
+        else:
+            print(f"  {i:2d}: Row has {len(row)} columns: {row}")
 
     if len(rows) > 10:
         print(f"  ... and {len(rows) - 10} more items")

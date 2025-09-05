@@ -74,22 +74,22 @@ XS8911A      | 191009710615| 4-3/4"L x 3-1/2"W...   | 12      | 0         | 0   
 def extract_creative_coop_quantity_improved(text, product_code):
     """
     Multi-tier quantity extraction for Creative-Coop invoices
-    
+
     Tier 1: Tabular column parsing for structured invoices
     Tier 2: Pattern-based extraction for formatted text
     Tier 3: Context-aware parsing for mixed formats
     """
-    
+
     # Tier 1: Try tabular extraction first
     qty = extract_quantity_from_table_columns(text, product_code)
     if qty is not None:
         return qty
-    
+
     # Tier 2: Fallback to existing patterns
     qty = extract_quantity_from_patterns(text, product_code)
     if qty is not None:
         return qty
-    
+
     # Tier 3: Context-aware extraction
     return extract_quantity_from_context(text, product_code)
 ```

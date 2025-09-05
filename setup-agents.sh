@@ -42,7 +42,7 @@ else
     exit 1
 fi
 
-# 3. Create Coding Agent (Sonnet 4)  
+# 3. Create Coding Agent (Sonnet 4)
 echo "👨‍💻 Creating Coding Agent..."
 claude-code agent create coding-agent \
   --model claude-sonnet-4-20250514 \

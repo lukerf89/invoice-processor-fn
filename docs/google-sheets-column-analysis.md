@@ -1,14 +1,14 @@
 # Google Sheets Column Alignment Analysis Report
 
-**Date:** September 5, 2025  
-**Issue:** Data writing to Column A instead of Column B in Google Sheets  
+**Date:** September 5, 2025
+**Issue:** Data writing to Column A instead of Column B in Google Sheets
 **Status:** ✅ Main production code is CORRECT - Issue likely from test scripts
 
 ---
 
 ## Executive Summary
 
-**The main production code in `main.py` is correctly configured** to write data starting in Column B. All Google Sheets append operations use the `B:G` range and all row structures start with Column B data. 
+**The main production code in `main.py` is correctly configured** to write data starting in Column B. All Google Sheets append operations use the `B:G` range and all row structures start with Column B data.
 
 **If data is still appearing in Column A, it's most likely caused by test scripts being run against production Google Sheets**, as 14 test scripts still contain legacy Column A placeholders from before the August 2025 fixes.
 
@@ -20,7 +20,7 @@
 
 **All Google Sheets operations in main.py correctly use B:G range:**
 - Line 182: `range=f"'{sheet_name}'!B:G"` (Gemini processing path)
-- Line 331: `range=f"'{sheet_name}'!B:G"` (Fallback processing path)  
+- Line 331: `range=f"'{sheet_name}'!B:G"` (Fallback processing path)
 - Line 586: `range=f"'{sheet_name}'!B:G"` (Document AI processing path)
 
 **All row structures in main.py correctly start with Column B data:**
@@ -54,7 +54,7 @@
 rows.append([
     "",              # Column A (blank) ← PROBLEM
     order_date,      # Column B
-    vendor,          # Column C  
+    vendor,          # Column C
     order_number,    # Column D
     description,     # Column E
     price_str,       # Column F
@@ -145,7 +145,7 @@ rows.append([
 rows.append([
     order_date,    # Column B
     vendor,        # Column C
-    order_number,  # Column D 
+    order_number,  # Column D
     description,   # Column E
     price_str,     # Column F
     quantity,      # Column G

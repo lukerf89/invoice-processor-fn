@@ -59,10 +59,10 @@ def test_[specific_behavior]_when_[condition]():
     # Arrange
     mock_document = load_test_invoice('test_invoices/sample.pdf')
     expected_result = [expected_line_items]
-    
+
     # Act
     result = [function_under_test](mock_document)
-    
+
     # Assert
     assert result == expected_result
     assert len(result) > 0
@@ -133,7 +133,7 @@ When reviewing code from the coding agent:
 **Issues Found**:
 - [ ] [Specific test improvement needed]
 
-## Engineering Principles Compliance  
+## Engineering Principles Compliance
 **Applied**: [List principles 1-10 that are correctly implemented]
 **Missing**: [List principles that need attention]
 
@@ -146,7 +146,7 @@ When reviewing code from the coding agent:
 - [ ] **AI Integration**: Proper error handling for Document AI/Gemini failures
 - [ ] **Performance**: Within timeout limits
 
-## Improvement Suggestions  
+## Improvement Suggestions
 - [ ] [Performance optimization]
 - [ ] [Code quality improvement]
 

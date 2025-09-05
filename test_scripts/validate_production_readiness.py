@@ -114,7 +114,7 @@ class ProductionReadinessValidator:
                     "text": """
                     Creative-Coop Product Listing
                     DF6802 8 0 lo each $12.50 $100.00
-                    ST1234 6 0 Set $8.00 $48.00  
+                    ST1234 6 0 Set $8.00 $48.00
                     DA8921A Blue Ceramic Vase 4 0 each $15.00 wholesale
                     """,
                     "expected_products": ["DF6802", "ST1234", "DA8921A"],
@@ -348,7 +348,7 @@ class ProductionReadinessValidator:
                 """
             Creative-Coop Invoice CI004848705
             Date: 01/15/2025
-            
+
             XS9826A 191009727774 6"H Metal Ballerina Ornament 24 0 0 24 each 2.00 1.60 38.40
             XS9482 191009714712 8.25"H Wood Shoe Ornament 12 0 0 12 each 3.50 2.80 33.60
             DF6802 Blue Ceramic Vase 8 0 lo each $12.50 $100.00

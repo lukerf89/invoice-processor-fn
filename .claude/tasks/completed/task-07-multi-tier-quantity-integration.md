@@ -26,10 +26,10 @@ def test_tier1_tabular_extraction_success():
     """Test Tier 1 (tabular) extraction succeeds and skips lower tiers"""
     # Arrange - tabular format should be detected and processed
     tabular_text = "XS9826A 191009727774 6\"H Metal Ballerina 24 0 0 24 each 2.00 1.60 38.40"
-    
+
     # Act
     result = extract_creative_coop_quantity_improved(tabular_text, "XS9826A")
-    
+
     # Assert
     assert result == 24
 
@@ -37,10 +37,10 @@ def test_tier2_pattern_fallback_when_tabular_fails():
     """Test Tier 2 (pattern-based) fallback when tabular parsing fails"""
     # Arrange - old Creative-Coop format that tabular parser can't handle
     pattern_text = "DF6802 8 0 lo each $12.50 $100.00 description continues..."
-    
+
     # Act
     result = extract_creative_coop_quantity_improved(pattern_text, "DF6802")
-    
+
     # Assert
     assert result == 8  # Should extract from "8 0 lo each" pattern
 
@@ -53,10 +53,10 @@ def test_tier3_context_fallback_when_patterns_fail():
     Ordered: 24 units
     Status: Available
     """
-    
+
     # Act
     result = extract_creative_coop_quantity_improved(context_text, "XS9826A")
-    
+
     # Assert
     assert result == 24  # Should extract from "Ordered: 24 units"
 
@@ -64,10 +64,10 @@ def test_all_tiers_fail_returns_none():
     """Test that None is returned when all tiers fail"""
     # Arrange - text with no extractable quantity
     no_quantity_text = "XS9826A Some description without any numbers"
-    
+
     # Act
     result = extract_creative_coop_quantity_improved(no_quantity_text, "XS9826A")
-    
+
     # Assert
     assert result is None
 
@@ -78,13 +78,13 @@ def test_tier_performance_early_exit():
     XS9826A 191009727774 Ballerina 24 0 0 24 each 2.00  # Tabular format
     DF6802 8 0 lo each $12.50  # Pattern format
     """
-    
+
     # Mock lower tiers to track if they're called
     with patch('main.extract_quantity_from_patterns') as mock_patterns:
         with patch('main.extract_quantity_from_context') as mock_context:
             # Act
             result = extract_creative_coop_quantity_improved(mixed_text, "XS9826A")
-            
+
             # Assert
             assert result == 24
             # Lower tiers should not be called since tabular succeeded
@@ -98,7 +98,7 @@ def test_backward_compatibility_existing_invoices():
     DF6802 8 0 lo each $12.50 $100.00
     ST1234 6 0 Set $8.00 $48.00
     """
-    
+
     # Act & Assert - both should work via pattern fallback
     assert extract_creative_coop_quantity_improved(existing_format, "DF6802") == 8
     assert extract_creative_coop_quantity_improved(existing_format, "ST1234") == 6
@@ -110,7 +110,7 @@ def test_cs_error2_specific_products():
     XS8911A 191009710615 4-3/4"L x 3-1/2"W x 10"H Metal 12 0 0 0 each 10.00 8.00 0.00
     XS9482 191009714712 8.25"H Wood Shoe Ornament 12 0 0 12 each 3.50 2.80 33.60
     """
-    
+
     # Act & Assert
     assert extract_creative_coop_quantity_improved(cs_error2_sample, "XS9826A") == 24
     assert extract_creative_coop_quantity_improved(cs_error2_sample, "XS8911A") == 12
@@ -129,46 +129,46 @@ def test_integration_with_process_creative_coop_document():
 def extract_creative_coop_quantity_improved(text, product_code):
     """
     Multi-tier quantity extraction for Creative-Coop invoices.
-    
+
     Tier 1: Tabular column parsing (NEW) - for structured CS003837319_Error 2.PDF format
-    Tier 2: Pattern-based extraction (EXISTING) - for "8 0 lo each" format  
+    Tier 2: Pattern-based extraction (EXISTING) - for "8 0 lo each" format
     Tier 3: Context-aware parsing - for complex mixed formats
-    
+
     Args:
         text (str): Invoice text containing product information
         product_code (str): Product code to extract quantity for
-        
+
     Returns:
         int: Extracted quantity, None if extraction fails
     """
     if product_code not in text:
         return None
-    
+
     # Tier 1: Try tabular extraction first (handles CS003837319_Error 2.PDF)
     qty = extract_quantity_from_table_columns(text, product_code)
     if qty is not None:
         print(f"Tier 1 (Tabular): Extracted qty {qty} for {product_code}")
         return qty
-    
+
     # Tier 2: Fallback to existing pattern-based extraction
     qty = extract_quantity_from_patterns(text, product_code)
     if qty is not None:
         print(f"Tier 2 (Pattern): Extracted qty {qty} for {product_code}")
         return qty
-    
+
     # Tier 3: Context-aware extraction for complex cases
     qty = extract_quantity_from_context(text, product_code)
     if qty is not None:
         print(f"Tier 3 (Context): Extracted qty {qty} for {product_code}")
         return qty
-    
+
     print(f"All tiers failed: No quantity found for {product_code}")
     return None
 
 def extract_quantity_from_patterns(text, product_code):
     """
     Tier 2: Pattern-based quantity extraction (existing logic).
-    
+
     Handles formats like:
     - "DF6802 8 0 lo each $12.50"
     - "ST1234 6 0 Set $8.00"
@@ -183,42 +183,42 @@ def extract_quantity_from_patterns(text, product_code):
     # Creative-Coop quantity patterns (existing patterns)
     qty_patterns = [
         r"\b(\d+)\s+\d+\s+lo\s+each\b",  # "8 0 lo each"
-        r"\b(\d+)\s+\d+\s+Set\b",        # "6 0 Set"  
+        r"\b(\d+)\s+\d+\s+Set\b",        # "6 0 Set"
         r"\b(\d+)\s+\d+\s+each\b",       # "24 0 each"
     ]
 
     # Look for patterns near the product code
     search_window = text[product_pos:product_pos + 200]
-    
+
     for pattern in qty_patterns:
         import re
         match = re.search(pattern, search_window)
         if match:
             return int(match.group(1))
-    
+
     return None
 
 def extract_quantity_from_context(text, product_code):
     """
     Tier 3: Context-aware quantity extraction for complex formats.
-    
+
     Handles formats like:
     - "Product: XS9826A\nOrdered: 24 units"
     - Multi-line with quantity keywords
     """
     if product_code not in text:
         return None
-    
+
     import re
-    
+
     # Find product code position
     product_pos = text.find(product_code)
-    
+
     # Search window around product code
     window_start = max(0, product_pos - 100)
     window_end = min(len(text), product_pos + 300)
     search_window = text[window_start:window_end]
-    
+
     # Context patterns for quantity extraction
     context_patterns = [
         r"Ordered:\s*(\d+)",           # "Ordered: 24"
@@ -227,22 +227,22 @@ def extract_quantity_from_context(text, product_code):
         r"\b(\d+)\s*units?\b",         # "24 units"
         r"\b(\d+)\s*pieces?\b",        # "24 pieces"
     ]
-    
+
     for pattern in context_patterns:
         match = re.search(pattern, search_window, re.IGNORECASE)
         if match:
             return int(match.group(1))
-    
+
     return None
 
 # Update the main Creative-Coop processing to use new function
 def process_creative_coop_document(document):
     """Update to use improved quantity extraction"""
     # ... existing code ...
-    
+
     # Replace calls to extract_creative_coop_quantity with:
     # quantity = extract_creative_coop_quantity_improved(entity.mention_text, product_code)
-    
+
     # ... rest of existing logic ...
 ```
 
@@ -254,7 +254,7 @@ def extract_creative_coop_quantity_improved(text, product_code):
     """
     if not text or not product_code or product_code not in text:
         return None
-    
+
     # Define extraction strategies with metadata
     extraction_tiers = [
         {
@@ -263,17 +263,17 @@ def extract_creative_coop_quantity_improved(text, product_code):
             'description': 'Column-based parsing for structured invoices'
         },
         {
-            'name': 'Pattern', 
+            'name': 'Pattern',
             'function': extract_quantity_from_patterns,
             'description': 'Regex pattern matching for formatted text'
         },
         {
             'name': 'Context',
-            'function': extract_quantity_from_context, 
+            'function': extract_quantity_from_context,
             'description': 'Context-aware extraction for complex formats'
         }
     ]
-    
+
     # Try each tier in order
     for i, tier in enumerate(extraction_tiers, 1):
         try:
@@ -284,7 +284,7 @@ def extract_creative_coop_quantity_improved(text, product_code):
         except Exception as e:
             print(f"Tier {i} ({tier['name']}) failed for {product_code}: {e}")
             continue
-    
+
     print(f"All {len(extraction_tiers)} tiers failed: No quantity found for {product_code}")
     return None
 
@@ -293,12 +293,12 @@ def extract_quantity_with_timing(text, product_code):
     """Wrapper with performance monitoring"""
     import time
     start_time = time.time()
-    
+
     result = extract_creative_coop_quantity_improved(text, product_code)
-    
+
     end_time = time.time()
     processing_time = (end_time - start_time) * 1000  # Convert to milliseconds
-    
+
     print(f"Quantity extraction for {product_code}: {result} in {processing_time:.2f}ms")
     return result
 ```
@@ -331,7 +331,7 @@ def extract_quantity_with_timing(text, product_code):
 
 ### Integration Points
 - **Update**: `process_creative_coop_document()` to use `extract_creative_coop_quantity_improved()`
-- **Replace**: All calls to `extract_creative_coop_quantity()` with new multi-tier function  
+- **Replace**: All calls to `extract_creative_coop_quantity()` with new multi-tier function
 - **Maintain**: Existing function signatures for backward compatibility
 - **Add**: Performance monitoring and structured logging for tier usage analytics
 

@@ -13,7 +13,7 @@ Implement invoice processing tasks created by the Senior Engineer agent using TD
 
 ## Core Rules
 1. **ALWAYS** start with tests (RED phase)
-2. **NEVER** skip test implementation  
+2. **NEVER** skip test implementation
 3. **NEVER** hardcode vendor-specific values - use algorithmic patterns
 4. Follow the exact test structure provided by Senior Engineer
 5. Implement minimal code to pass tests (GREEN phase)
@@ -60,15 +60,15 @@ def process_invoice(document):
         # Tier 1: Gemini AI (currently disabled for timeout)
         # result = process_with_gemini_first(document)
         # if result: return result
-        
+
         # Tier 2: Document AI Entities
         result = extract_line_items_from_entities(document)
         if result: return result
-        
+
         # Tier 3: Document AI Tables
-        result = extract_line_items(document)  
+        result = extract_line_items(document)
         if result: return result
-        
+
         # Tier 4: Text parsing fallback
         return extract_line_items_from_text(document)
     except Exception as e:

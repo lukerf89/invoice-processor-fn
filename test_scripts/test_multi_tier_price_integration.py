@@ -84,7 +84,7 @@ def test_tier_3_context_aware_extraction():
         Wholesale Price: $1.60 each
         Retail Price: $2.00 each
         Quantity Ordered: 24
-        
+
         Item: DF6802
         Description: Blue Ceramic Vase
         Price per unit: $12.50
@@ -110,14 +110,14 @@ def test_mixed_format_document():
 
     mixed_text = """
     Invoice: CS003837319
-    
+
     Tabular Section:
     Product Code | UPC         | Description              | Qty Ord | Qty Alloc | Qty Shipped | Qty BkOrd | U/M  | List Price | Your Price | Your Extd Price
     XS9826A      | 191009727774| 6"H Metal Ballerina... | 24      | 0         | 0           | 24        | each | 2.00       | 1.60       | 38.40
-    
+
     Pattern Section:
     DF6802 Ceramic Vase 8 0 Set $12.50 wholesale $100.00
-    
+
     Context Section:
     Product ST1234:
     Cotton Throw Blanket
@@ -192,11 +192,11 @@ def test_error_handling_tier_failures():
     # Test with malformed data that might break individual tiers
     malformed_text = """
     Corrupted tabular data:
-    XS9826A | | | | | | | | corrupted_price | 
-    
+    XS9826A | | | | | | | | corrupted_price |
+
     Corrupted pattern data:
     XS9827A invalid format no price
-    
+
     Empty context:
     XS9828A:
     """
@@ -227,7 +227,7 @@ def test_cs_error2_integration():
     2.00
     1.60
     38.40
-    
+
     XS9649A
     191009725688
     8"H x 6.5"W x 4"D Paper Mache

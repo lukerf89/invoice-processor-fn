@@ -23,7 +23,7 @@ from main import extract_price_from_table_columns
 
 def test_extract_price_from_basic_tabular_format():
     """Test basic tabular price extraction from structured columns"""
-    
+
     # Sample tabular format from CS003837319_Error 2.PDF
     tabular_text = """
     Product Code | UPC         | Description              | Qty Ord | Qty Alloc | Qty Shipped | Qty BkOrd | U/M  | List Price | Your Price | Your Extd Price
@@ -31,7 +31,7 @@ def test_extract_price_from_basic_tabular_format():
     XS8911A      | 191009710615| 4-3/4"L x 3-1/2"W...   | 12      | 0         | 0           | 0         | each | 10.00      | 8.00       | 0.00
     XS9482       | 191009714712| 8.25"H Wood Shoe...     | 12      | 0         | 0           | 12        | each | 3.50       | 2.80       | 33.60
     """
-    
+
     # Test price extraction for each product
     assert extract_price_from_table_columns(tabular_text, "XS9826A") == 1.60
     assert extract_price_from_table_columns(tabular_text, "XS8911A") == 8.00
@@ -39,26 +39,26 @@ def test_extract_price_from_basic_tabular_format():
 
 def test_extract_price_handles_currency_symbols():
     """Test price extraction with various currency symbol formats"""
-    
+
     text_with_currency = """
     XS9826A | 191009727774 | Product | 24 | 0 | 0 | 24 | each | $2.00 | $1.60 | $38.40
     XS8911A | 191009710615 | Product | 12 | 0 | 0 | 0  | each | 10.00 | 8.00  | 0.00
     XS9482  | 191009714712 | Product | 12 | 0 | 0 | 12 | each | €3.50 | €2.80 | €33.60
     """
-    
+
     assert extract_price_from_table_columns(text_with_currency, "XS9826A") == 1.60
     assert extract_price_from_table_columns(text_with_currency, "XS8911A") == 8.00
     assert extract_price_from_table_columns(text_with_currency, "XS9482") == 2.80
 
 def test_extract_price_handles_malformed_data():
     """Test price extraction with malformed or missing price data"""
-    
+
     malformed_text = """
     XS9826A | 191009727774 | Product | 24 | 0 | 0 | 24 | each | 2.00 | N/A | 38.40
     XS8911A | 191009710615 | Product | 12 | 0 | 0 | 0  | each | 10.00 |     | 0.00
     XS9482  | 191009714712 | Product | 12 | 0 | 0 | 12 | each | 3.50 | Invalid | 33.60
     """
-    
+
     # Should return None or 0.0 for invalid prices
     assert extract_price_from_table_columns(malformed_text, "XS9826A") is None
     assert extract_price_from_table_columns(malformed_text, "XS8911A") is None
@@ -66,35 +66,35 @@ def test_extract_price_handles_malformed_data():
 
 def test_extract_price_handles_whitespace_variations():
     """Test price extraction with various whitespace and formatting variations"""
-    
+
     whitespace_text = """
     XS9826A    |   191009727774  | Product Name           |  24  |   0   |    0    |  24   | each |  2.00  |  1.60  |  38.40
       XS8911A  | 191009710615    | Another Product        |  12  |   0   |    0    |   0   | each | 10.00  |  8.00  |   0.00
     XS9482     |191009714712     |Third Product           | 12   | 0     | 0       | 12    |each  |3.50    |2.80    |33.60
     """
-    
+
     assert extract_price_from_table_columns(whitespace_text, "XS9826A") == 1.60
     assert extract_price_from_table_columns(whitespace_text, "XS8911A") == 8.00
     assert extract_price_from_table_columns(whitespace_text, "XS9482") == 2.80
 
 def test_extract_price_handles_zero_prices():
     """Test price extraction for products with zero wholesale prices"""
-    
+
     zero_price_text = """
     XS9826A | 191009727774 | Product | 24 | 0 | 0 | 24 | each | 2.00 | 0.00 | 0.00
     XS8911A | 191009710615 | Product | 12 | 0 | 0 | 0  | each | 10.00 | 0    | 0
     """
-    
+
     assert extract_price_from_table_columns(zero_price_text, "XS9826A") == 0.00
     assert extract_price_from_table_columns(zero_price_text, "XS8911A") == 0.00
 
 def test_extract_price_product_not_found():
     """Test price extraction when product code is not found in text"""
-    
+
     text = """
     XS9826A | 191009727774 | Product | 24 | 0 | 0 | 24 | each | 2.00 | 1.60 | 38.40
     """
-    
+
     assert extract_price_from_table_columns(text, "XS9999A") is None
     assert extract_price_from_table_columns(text, "") is None
     assert extract_price_from_table_columns("", "XS9826A") is None
@@ -102,25 +102,25 @@ def test_extract_price_product_not_found():
 def test_extract_price_performance():
     """Test price extraction performance with large tabular data"""
     import time
-    
+
     # Generate large tabular data
     large_text_lines = []
     for i in range(1000):
         large_text_lines.append(f"XS{i:04d}A | 191009{i:06d} | Product {i} | {i+10} | 0 | 0 | {i+10} | each | {2.00+i*0.1:.2f} | {1.60+i*0.08:.2f} | {(i+10)*(1.60+i*0.08):.2f}")
-    
+
     large_text = "\n".join(large_text_lines)
-    
+
     start_time = time.time()
     price = extract_price_from_table_columns(large_text, "XS0500A")
     end_time = time.time()
-    
+
     extraction_time = end_time - start_time
     assert extraction_time < 1.0, f"Extraction took {extraction_time:.3f}s, expected < 1.0s"
     assert price == pytest.approx(41.60, abs=0.01)
 
 def test_extract_price_cs_error2_specific_products():
     """Test price extraction for specific products from CS003837319_Error 2.PDF"""
-    
+
     # Load actual CS Error 2 document for testing
     cs_error2_text = """
     XS9826A | 191009727774 | 6"H Metal Ballerina Ornament | 24 | 0 | 0 | 24 | each | 2.00 | 1.60 | 38.40
@@ -128,7 +128,7 @@ def test_extract_price_cs_error2_specific_products():
     XS9482  | 191009714712 | 8.25"H Wood Shoe Ornament | 12 | 0 | 0 | 12 | each | 3.50 | 2.80 | 33.60
     XS8185  | 191009721666 | 18"L x 12"W Cotton Lumbar Pillow | 16 | 0 | 0 | 16 | each | 15.00 | 12.00 | 192.00
     """
-    
+
     # Test specific expected prices from manual PDF analysis
     expected_prices = {
         "XS9826A": 1.60,
@@ -136,7 +136,7 @@ def test_extract_price_cs_error2_specific_products():
         "XS9482": 2.80,
         "XS8185": 12.00
     }
-    
+
     for product_code, expected_price in expected_prices.items():
         extracted_price = extract_price_from_table_columns(cs_error2_text, product_code)
         assert extracted_price == pytest.approx(expected_price, abs=0.01), f"{product_code}: Expected ${expected_price}, got ${extracted_price}"
@@ -149,53 +149,53 @@ def test_extract_price_cs_error2_specific_products():
 def extract_price_from_table_columns(text, product_code):
     """
     Extract wholesale price from tabular Creative-Coop format.
-    
+
     Looks for tabular structure:
     Product Code | UPC | Description | Qty Ord | ... | Your Price | ...
-    
+
     Args:
         text (str): Document text containing tabular data
         product_code (str): Product code to find price for
-        
+
     Returns:
         float: Extracted price, or None if not found
     """
-    
+
     if not text or not product_code:
         return None
-    
+
     lines = text.split('\n')
-    
+
     for line in lines:
         # Skip header lines and empty lines
         if not line.strip() or 'Product Code' in line or '|' not in line:
             continue
-        
+
         # Split by pipe separator
         columns = [col.strip() for col in line.split('|')]
-        
+
         # Basic validation: should have at least 10 columns for tabular format
         if len(columns) < 10:
             continue
-        
+
         # Check if this line contains our product code (first column)
         if columns[0] == product_code:
             # Price is in 10th column (index 9): "Your Price"
             price_text = columns[9].strip()
-            
+
             # Clean price text (remove currency symbols, whitespace)
             price_text = price_text.replace('$', '').replace('€', '').replace(',', '').strip()
-            
+
             # Handle N/A, empty, or invalid values
             if not price_text or price_text.upper() in ['N/A', 'INVALID', 'NULL']:
                 return None
-            
+
             try:
                 price = float(price_text)
                 return price
             except ValueError:
                 return None
-    
+
     return None
 ```
 
@@ -209,34 +209,34 @@ def extract_price_from_table_columns(text, product_code):
     and error handling.
     """
     import re
-    
+
     if not text or not product_code:
         return None
-    
+
     # Use regex to find product line more efficiently
     # Look for lines starting with product code followed by pipe
     pattern = rf'^{re.escape(product_code)}\s*\|(.+?)$'
-    
+
     for match in re.finditer(pattern, text, re.MULTILINE):
         line_content = match.group(1)
-        
+
         # Split remaining content by pipe
         columns = [col.strip() for col in line_content.split('|')]
-        
+
         # Validate we have enough columns for tabular format
         if len(columns) < 9:  # Need at least 9 more columns after product code
             continue
-        
+
         # Price should be in column 8 (9th position after product code)
         # Format: UPC | Description | Qty Ord | Qty Alloc | Qty Shipped | Qty BkOrd | U/M | List Price | Your Price
         price_column_index = 8
-        
+
         if len(columns) > price_column_index:
             price_text = columns[price_column_index].strip()
-            
+
             # Enhanced price cleaning with regex
             price_clean = re.sub(r'[^\d\.]', '', price_text)
-            
+
             if price_clean:
                 try:
                     price = float(price_clean)
@@ -245,7 +245,7 @@ def extract_price_from_table_columns(text, product_code):
                         return price
                 except ValueError:
                     pass
-    
+
     return None
 ```
 
@@ -264,7 +264,7 @@ def extract_price_from_table_columns(text, product_code):
 
 **TDD Cycle Completed Successfully**:
 - ✅ **RED Phase**: Comprehensive failing tests written and executed
-- ✅ **GREEN Phase**: Minimal working implementation that passes all tests  
+- ✅ **GREEN Phase**: Minimal working implementation that passes all tests
 - ✅ **REFACTOR Phase**: Enhanced multi-line format recognition for CS Error 2
 
 **Performance Results**:
@@ -277,7 +277,7 @@ def extract_price_from_table_columns(text, product_code):
 Discovered and implemented support for Creative-Coop's multi-line product format:
 ```
 XS9826A
-191009727774  
+191009727774
 6"H Metal Ballerina Ornament,
 24
 0

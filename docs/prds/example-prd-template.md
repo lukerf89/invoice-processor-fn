@@ -7,7 +7,7 @@ Example: "Improve Creative-Coop invoice processing accuracy from 75% to 90% to r
 ## Success Criteria
 [Measurable outcomes]
 - Processing accuracy: [Current %] → [Target %]
-- Processing time: [Current time] → [Target time] 
+- Processing time: [Current time] → [Target time]
 - Manual review reduction: [Hours saved per week]
 - Vendor coverage: [Current vendors] → [New vendors supported]
 

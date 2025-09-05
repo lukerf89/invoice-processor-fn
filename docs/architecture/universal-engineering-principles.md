@@ -152,7 +152,7 @@ def process_invoice_with_fallback(document):
         ('document_ai_tables', extract_line_items),
         ('text_parsing', extract_line_items_from_text)
     ]
-    
+
     for tier_name, processor in processing_tiers:
         try:
             result = processor(document)
@@ -162,7 +162,7 @@ def process_invoice_with_fallback(document):
         except Exception as e:
             logger.warning(f"Processing tier {tier_name} failed: {e}")
             continue
-    
+
     raise ProcessingError("All processing tiers failed")
 ```
 
@@ -186,7 +186,7 @@ class VendorProcessor:
     """Base class for vendor-specific processing"""
     def extract_line_items(self, document):
         raise NotImplementedError
-    
+
     def detect_vendor(self, text):
         raise NotImplementedError
 
@@ -254,15 +254,15 @@ class TestCreativeCoopProcessing:
             ("ST1234 12 5 Set $8.00", 12),
             ("AB9999 1 0 Case $15.00", 1)
         ]
-        
+
         for text, expected_qty in test_cases:
             result = extract_creative_coop_quantity(text)
             assert result == expected_qty, f"Failed for: {text}"
-    
+
     def test_handles_malformed_input(self):
         """Test graceful handling of malformed data"""
         malformed_inputs = ["", "invalid text", "DF6802 invalid quantity"]
-        
+
         for invalid_input in malformed_inputs:
             result = extract_creative_coop_quantity(invalid_input)
             assert isinstance(result, int), "Should return integer even for invalid input"
@@ -288,23 +288,23 @@ class TestCreativeCoopProcessing:
 def extract_creative_coop_quantity(text):
     """
     Extract ordered quantity from Creative-Coop invoice line items.
-    
+
     Pattern: "DF6802 8 0 lo each $12.50 $100.00"
     Where: [product_code] [ordered_qty] [backordered_qty] [unit] [unit_type] [unit_price] [total]
-    
+
     Args:
         text (str): Line item text from invoice
-        
+
     Returns:
         int: Ordered quantity, 0 if pattern not found
-        
+
     Accuracy: 95% on test dataset (24/25 items correctly extracted)
     Last Updated: 2024-01-15
-    
+
     Examples:
         >>> extract_creative_coop_quantity("DF6802 8 0 lo each $12.50")
         8
-        >>> extract_creative_coop_quantity("ST1234 12 5 Set $8.00")  
+        >>> extract_creative_coop_quantity("ST1234 12 5 Set $8.00")
         12
     """
     pattern = r'^\w+\s+(\d+)\s+\d+\s+\w+\s+\w+\s+\$[\d\.]+.*$'
@@ -319,7 +319,7 @@ def extract_creative_coop_quantity(text):
 **Scenario**: If Document AI fails to extract Creative-Coop line items:
 
 1. **Reliability**: System retries Document AI call 3 times with exponential backoff
-2. **Resilience**: After retries fail, falls back to text-based pattern extraction  
+2. **Resilience**: After retries fail, falls back to text-based pattern extraction
 3. **Observability**: Logs structured error with invoice context and correlation ID
 4. **Maintainability**: Uses algorithmic quantity extraction patterns, not hardcoded logic
 5. **Fault Tolerance**: Processing continues for other line items even if some fail
@@ -333,14 +333,14 @@ def extract_creative_coop_quantity(text):
 ```python
 def process_creative_coop_with_principles(document, correlation_id):
     """Process Creative-Coop invoice following all 10 engineering principles"""
-    
+
     try:
         # Reliability: Retry with exponential backoff
         result = retry_with_backoff(
             lambda: extract_line_items_from_entities(document),
             max_attempts=3
         )
-        
+
         if result:
             # Observability: Log success
             logger.info("Document AI extraction successful", extra={
@@ -349,20 +349,20 @@ def process_creative_coop_with_principles(document, correlation_id):
                 'items_extracted': len(result)
             })
             return result
-            
+
     except Exception as e:
         # Resilience: Fall back to algorithmic extraction
         logger.warning("Document AI failed, using pattern extraction", extra={
             'correlation_id': correlation_id,
             'error': str(e)
         })
-        
+
         # Maintainability: Use algorithmic patterns
         result = extract_creative_coop_patterns(document.text)
-        
+
         # Security: Validate extracted data
         validated_result = validate_line_items(result)
-        
+
         return validated_result
 ```
 

@@ -26,7 +26,7 @@ import logging
 # Functions to be implemented
 from main import (
     validate_column_alignment,
-    validate_row_format, 
+    validate_row_format,
     write_to_sheet_with_validation,
     log_column_alignment_error
 )
@@ -41,7 +41,7 @@ def test_validation_detects_wrong_column_count():
             "expected_valid": False,
             "expected_error": "Row 0 has 4 columns, expected 6"
         },
-        # Too many columns  
+        # Too many columns
         {
             "rows": [["", "2023-01-15", "Creative-Coop", "INV001", "Item", "8.50", "12", "Extra"]],  # 8 columns
             "expected_valid": False,
@@ -57,7 +57,7 @@ def test_validation_detects_wrong_column_count():
             "expected_error": "Row 1 has 4 columns, expected 6"
         }
     ]
-    
+
     for case in test_cases:
         # This should fail initially - validation function doesn't exist
         with pytest.raises(NameError):
@@ -70,7 +70,7 @@ def test_validation_allows_correct_column_format():
         ["2023-01-15", "Creative-Coop", "INV001", "XS8911A; Metal Item", "12.00", "6"],
         ["2023-01-16", "HarperCollins", "PO123", "ISBN123; Book Title", "15.00", "8"]
     ]
-    
+
     # This should fail initially - function doesn't exist
     with pytest.raises(NameError):
         result = validate_column_alignment(correct_rows)
@@ -82,18 +82,18 @@ def test_google_sheets_write_without_validation_allows_bad_data():
     with patch('main.build') as mock_build:
         mock_service = MagicMock()
         mock_build.return_value = mock_service
-        
+
         # Bad data with wrong column count
         bad_rows = [
             ["2023-01-15", "Creative-Coop", "INV001"]  # Only 3 columns
         ]
-        
+
         # Current implementation should allow this bad data through
         # This test demonstrates the current problem - no validation
-        
+
         # Import current write function (should exist)
         from main import write_to_sheet
-        
+
         # This should succeed but write bad data (the problem we're fixing)
         try:
             write_to_sheet(bad_rows, "test-sheet", "B:G")
@@ -112,25 +112,25 @@ def test_error_logging_captures_column_issues():
 def test_performance_impact_of_validation():
     """Test that validation doesn't significantly impact processing speed"""
     import time
-    
+
     # Large dataset to test performance
     large_dataset = []
     for i in range(1000):
         large_dataset.append([
-            f"2023-01-{i%30+1:02d}", 
-            "Creative-Coop", 
-            f"INV{i:04d}", 
-            f"XS{i}A; Test Item {i}", 
-            f"{(i%100)+1}.50", 
+            f"2023-01-{i%30+1:02d}",
+            "Creative-Coop",
+            f"INV{i:04d}",
+            f"XS{i}A; Test Item {i}",
+            f"{(i%100)+1}.50",
             str(i%50+1)
         ])
-    
+
     # This will fail initially - function doesn't exist
     with pytest.raises(NameError):
         start_time = time.time()
         result = validate_column_alignment(large_dataset)
         end_time = time.time()
-        
+
         # Should complete validation in under 100ms for 1000 rows
         assert (end_time - start_time) < 0.1, f"Validation too slow: {end_time - start_time:.3f}s"
         assert result is True
@@ -152,35 +152,35 @@ logger = logging.getLogger(__name__)
 def validate_column_alignment(rows, expected_columns=6):
     """
     Validate that all rows have exactly the expected number of columns for B:G range.
-    
+
     Args:
         rows: List of row data (each row is a list)
         expected_columns: Expected number of columns (default 6 for B:G)
-    
+
     Returns:
         bool: True if all rows have correct column count, False otherwise
     """
     if not rows:
         return True
-    
+
     for i, row in enumerate(rows):
         if len(row) != expected_columns:
             error_msg = f"⚠️ COLUMN ALIGNMENT ERROR: Row {i} has {len(row)} columns, expected {expected_columns}"
             logger.error(error_msg)
             logger.error(f"Row data: {row}")
             return False
-    
+
     return True
 
 def validate_row_format(row, row_index=0, expected_columns=6):
     """
     Validate a single row format.
-    
+
     Args:
         row: Single row data (list)
         row_index: Row index for error reporting
         expected_columns: Expected number of columns
-    
+
     Returns:
         dict: Validation result with success status and error message
     """
@@ -190,13 +190,13 @@ def validate_row_format(row, row_index=0, expected_columns=6):
             "error": f"Row {row_index} has {len(row)} columns, expected {expected_columns}",
             "row_data": row
         }
-    
+
     return {"valid": True, "error": None, "row_data": row}
 
 def log_column_alignment_error(sheet_name, row_index, row_data, expected_columns):
     """
     Log detailed column alignment error information.
-    
+
     Args:
         sheet_name: Name of the sheet being written to
         row_index: Index of the problematic row
@@ -209,7 +209,7 @@ def log_column_alignment_error(sheet_name, row_index, row_data, expected_columns
         f"Data: {row_data}"
     )
     logger.error(error_msg)
-    
+
     # Additional context logging
     logger.error(f"Expected format: 6 columns for Google Sheets B:G range")
     logger.error(f"Actual data types: {[type(item).__name__ for item in row_data]}")
@@ -217,12 +217,12 @@ def log_column_alignment_error(sheet_name, row_index, row_data, expected_columns
 def write_to_sheet_with_validation(line_items, sheet_name=None, range_name="B:G"):
     """
     Write line items to Google Sheet with column validation.
-    
+
     Args:
         line_items: List of line item data
         sheet_name: Google Sheets sheet name
         range_name: Cell range (default B:G for 6 columns)
-    
+
     Returns:
         bool: Success status
     """
@@ -230,7 +230,7 @@ def write_to_sheet_with_validation(line_items, sheet_name=None, range_name="B:G"
     if not validate_column_alignment(line_items):
         log_column_alignment_error(sheet_name or "Unknown", -1, line_items, 6)
         raise ValueError("Column alignment validation failed. See logs for details.")
-    
+
     # If validation passes, proceed with existing write logic
     return write_to_sheet(line_items, sheet_name, range_name)
 ```
@@ -243,15 +243,15 @@ Update existing Google Sheets write functions to include validation:
 # Modify existing write_to_sheet function in main.py
 def write_to_sheet(line_items, sheet_name=None, range_name=None):
     """Enhanced write_to_sheet with built-in validation"""
-    
+
     # Add validation at the beginning
     if not validate_column_alignment(line_items):
         # Don't write invalid data - fail fast
         raise ValueError("Invalid column alignment detected. Aborting write operation.")
-    
+
     # Log successful validation
     logger.info(f"Column validation passed for {len(line_items)} rows")
-    
+
     # Proceed with existing Google Sheets write logic...
     # [existing implementation remains unchanged]
 
@@ -260,18 +260,18 @@ def append_to_sheet(line_items, sheet_name=None, range_name=None):
     """Enhanced append with validation"""
     if not validate_column_alignment(line_items):
         raise ValueError("Invalid column alignment for append operation")
-    
+
     # Proceed with existing append logic...
 
 # Create monitoring function for proactive detection
 def validate_processing_pipeline(vendor_type, line_items):
     """
     Validate the entire processing pipeline output before final write.
-    
+
     Args:
         vendor_type: Type of vendor (Creative-Coop, HarperCollins, etc.)
         line_items: Processed line items
-    
+
     Returns:
         dict: Validation report
     """
@@ -281,25 +281,25 @@ def validate_processing_pipeline(vendor_type, line_items):
         "column_alignment_valid": False,
         "issues": []
     }
-    
+
     # Column alignment validation
     if validate_column_alignment(line_items):
         report["column_alignment_valid"] = True
     else:
         report["issues"].append("Column alignment validation failed")
-    
+
     # Additional validations
     for i, row in enumerate(line_items):
         validation_result = validate_row_format(row, i)
         if not validation_result["valid"]:
             report["issues"].append(f"Row {i}: {validation_result['error']}")
-    
+
     # Log validation report
     if report["issues"]:
         logger.warning(f"Validation issues for {vendor_type}: {report['issues']}")
     else:
         logger.info(f"All validations passed for {vendor_type} ({len(line_items)} rows)")
-    
+
     return report
 ```
 
@@ -352,7 +352,7 @@ def validate_processing_pipeline(vendor_type, line_items):
 ## Success Metrics
 
 - **Issue Prevention**: Zero column alignment issues reach Google Sheets
-- **Detection Speed**: Issues caught within 1ms of occurrence  
+- **Detection Speed**: Issues caught within 1ms of occurrence
 - **Error Quality**: 100% of validation errors include actionable information
 - **Performance**: < 5% overhead for validation processing
 - **Monitoring**: Proactive alerts for all column alignment issues

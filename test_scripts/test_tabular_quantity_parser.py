@@ -46,7 +46,7 @@ def test_extract_quantity_multiline_descriptions():
     """Test products with multi-line descriptions that break column alignment"""
     sample_text = """
     XS9840A   191009727910   2-1/2"H 3-1/4"H Metal &          24  14  0  24  each  3.50  2.80  67.20
-                             Tariff Surcharge                   
+                             Tariff Surcharge
     XS8185    191009721666   20"Lx12"H Cotton Lumbar Pillow   16  0   0  16  each  15.00 12.00 192.00
     """
 
@@ -185,10 +185,10 @@ def test_extract_quantity_edge_cases():
     edge_cases = """
     # Very long description wrapping
     XS7529 191009690856 14" Rd Metal Leaves & Flowers Extra Long Description That Spans Multiple Words 18 0 0 18 each 10.00 8.00 144.00
-    
+
     # Numbers in description
     XS3350 191009571414 S/3 28"L x 18"W Cotton Tea Towels with 12 Patterns 12 0 0 12 Set 10.00 8.00 96.00
-    
+
     # Decimal quantities (should still extract as integer)
     XS8838 191009709855 4" Rd x 8"H Glass Canister 6.0 0 0 6 each 7.00 5.60 33.60
     """
