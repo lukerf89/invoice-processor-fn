@@ -5,6 +5,7 @@ Final corrected processing - Fix price/quantity confusion and descriptions
 import json
 import re
 from datetime import datetime
+
 from main import *
 
 
@@ -203,8 +204,8 @@ def process_harpercollins_invoice():
 
     # Write to Google Sheets TEST tab
     try:
-        from googleapiclient.discovery import build
         from google.auth import default
+        from googleapiclient.discovery import build
 
         credentials, _ = default()
         service = build("sheets", "v4", credentials=credentials)

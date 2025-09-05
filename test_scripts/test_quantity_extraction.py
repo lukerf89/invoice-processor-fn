@@ -4,6 +4,7 @@ Test Creative-Coop quantity extraction
 """
 import json
 import re
+
 from main import extract_creative_coop_quantity
 
 # Test cases based on the debug output

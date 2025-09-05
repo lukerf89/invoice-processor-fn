@@ -2,11 +2,11 @@
 """
 Test script to process Rifle Paper invoice JSON and save CSV output
 """
-import json
 import csv
-from datetime import datetime
-import sys
+import json
 import os
+import sys
+from datetime import datetime
 
 # Add the parent directory to the path to import main
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

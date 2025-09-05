@@ -8,11 +8,11 @@ after implementation of multi-tier quantity and price extraction.
 RED PHASE: Write failing tests to ensure no regressions in existing functionality
 """
 
-import time
-import json
 import csv
+import json
 import os
 import threading
+import time
 from unittest.mock import Mock, patch
 
 # Try to import pytest, fall back to basic testing if not available
@@ -37,13 +37,13 @@ import sys
 sys.path.append("/Volumes/Working/Code/GoogleCloud/invoice-processor-fn")
 
 from main import (
+    detect_vendor_type,
+    extract_line_items,
+    extract_line_items_from_entities,
+    extract_line_items_from_text,
     process_creative_coop_document,
     process_harpercollins_document,
     process_onehundred80_document,
-    detect_vendor_type,
-    extract_line_items_from_entities,
-    extract_line_items,
-    extract_line_items_from_text,
 )
 
 

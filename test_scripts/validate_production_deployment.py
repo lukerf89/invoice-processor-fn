@@ -11,19 +11,19 @@ This script validates all aspects of production readiness:
 - Monitoring and observability
 """
 
+import concurrent.futures
+import csv
+import io
 import json
-import time
-import threading
 import os
 import sys
-import io
-import csv
-import concurrent.futures
-from contextlib import redirect_stdout, redirect_stderr
+import threading
+import time
+from contextlib import redirect_stderr, redirect_stdout
 
 # Add the main directory to Python path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from main import process_creative_coop_document, detect_vendor_type
+from main import detect_vendor_type, process_creative_coop_document
 
 
 def load_cs_error2_document():

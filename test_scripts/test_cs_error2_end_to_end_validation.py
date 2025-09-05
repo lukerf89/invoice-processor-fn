@@ -14,18 +14,19 @@ Test Requirements:
 - Accuracy benchmark tests with target 90%+ success rate
 """
 
-import pytest
-import json
 import csv
-import time
+import json
 import os
 import sys
+import time
 from unittest.mock import Mock
+
+import pytest
 
 # Add project root to Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from main import process_creative_coop_document, detect_vendor_type
+from main import detect_vendor_type, process_creative_coop_document
 
 # Expected results from manual PDF analysis of CS003837319_Error 2.PDF
 # These 20 products should be extracted with correct quantities and prices

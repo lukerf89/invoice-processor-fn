@@ -6,21 +6,21 @@ monitoring, security, and Zapier compatibility validation.
 RED PHASE: Define production readiness requirements through failing tests
 """
 
-import pytest
-import time
-import threading
+import csv
+import io
 import json
 import os
 import sys
-import io
-import csv
-from unittest.mock import Mock, patch, MagicMock
-from contextlib import redirect_stdout, redirect_stderr
+import threading
+import time
+from contextlib import redirect_stderr, redirect_stdout
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Add the main directory to Python path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from main import process_creative_coop_document, detect_vendor_type
-
+from main import detect_vendor_type, process_creative_coop_document
 
 # Expected results from manual PDF analysis of CS003837319_Error 2.PDF
 EXPECTED_CS_ERROR2_RESULTS = [
@@ -442,8 +442,9 @@ def test_security_production_hardening():
         try:
             # Import psutil only if available, otherwise skip memory test
             try:
-                import psutil
                 import os
+
+                import psutil
 
                 process = psutil.Process(os.getpid())
                 initial_memory = process.memory_info().rss / 1024 / 1024  # MB

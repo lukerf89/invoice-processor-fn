@@ -3,6 +3,7 @@
 Test the split function with Creative-Coop combined line items
 """
 import re
+
 from main import split_combined_line_item
 
 # Test with the problematic line item

@@ -3,6 +3,7 @@
 Analyze Rifle invoice processing to identify and fix the issues
 """
 import json
+
 from main import *
 
 # Load the Rifle document

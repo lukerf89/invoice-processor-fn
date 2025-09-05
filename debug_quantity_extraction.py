@@ -2,9 +2,10 @@
 """Debug quantity extraction issues in CS Error 2 processing"""
 
 import json
+
 from main import (
-    extract_quantity_from_table_columns,
     extract_creative_coop_quantity_from_price_context,
+    extract_quantity_from_table_columns,
 )
 
 

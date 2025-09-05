@@ -2,8 +2,8 @@
 """
 Check Google Sheets structure and write a simple test
 """
-from googleapiclient.discovery import build
 from google.auth import default
+from googleapiclient.discovery import build
 
 # Initialize
 credentials, _ = default()

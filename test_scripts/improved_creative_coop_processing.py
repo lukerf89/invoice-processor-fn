@@ -2,9 +2,10 @@
 """
 Improved Creative Coop processing with correct description/UPC mapping
 """
+import csv
 import json
 import re
-import csv
+
 from main import *
 
 

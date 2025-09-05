@@ -8,11 +8,11 @@ Ensures all existing functionality remains intact and system is ready for deploy
 GREEN PHASE: Validate production readiness across all dimensions
 """
 
-import time
 import json
 import os
 import sys
 import threading
+import time
 from datetime import datetime
 
 # Try to import psutil, fall back to basic memory tracking if not available
@@ -27,11 +27,11 @@ except ImportError:
 sys.path.append("/Volumes/Working/Code/GoogleCloud/invoice-processor-fn")
 
 from main import (
+    detect_vendor_type,
+    extract_line_items_from_entities,
     process_creative_coop_document,
     process_harpercollins_document,
     process_onehundred80_document,
-    detect_vendor_type,
-    extract_line_items_from_entities,
 )
 
 

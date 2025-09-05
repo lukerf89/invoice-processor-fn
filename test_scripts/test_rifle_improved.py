@@ -2,8 +2,9 @@
 """
 Test improved Rifle invoice processing with fixes
 """
-import json
 import csv
+import json
+
 from main import *
 
 # Load the Rifle document

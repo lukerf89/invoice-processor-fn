@@ -61,9 +61,53 @@ claude-code agent create coding-agent \
 claude-code agent list
 ```
 
-## Usage Commands
+## Custom Slash Commands (Quick Access)
 
-Once agents are created, use these commands for your development workflow:
+Once agents are created, you can use convenient slash commands for faster development:
+
+### Available Slash Commands
+
+**Descriptive Commands:**
+- `/product-manager` - Create comprehensive PRDs from business requirements
+- `/technical-pm` - Translate PRDs into executable phase documents  
+- `/senior-engineer` - Break down phases into atomic TDD tasks
+- `/coding-agent` - Implement TDD tasks using Red-Green-Refactor methodology
+
+**Short Commands (Aliases):**
+- `/pm` - Quick product-manager access
+- `/se` - Quick senior-engineer access  
+- `/ca` - Quick coding-agent access
+
+### Usage Examples
+
+```bash
+# Create a PRD from business requirements
+/pm "Create PRD for improving Creative-Coop invoice processing accuracy from 85% to 95%"
+
+# Break down a phase document into TDD tasks
+/se "Analyze docs/phases/phase-01-creative-coop-critical-fix.md and create comprehensive TDD task breakdown"
+
+# Implement specific tasks
+/ca "Implement Task 09 from .claude/tasks/pending/ following Red-Green-Refactor methodology"
+
+# Create technical implementation plan
+/technical-pm "Convert the Creative-Coop column alignment PRD into detailed phase documents with risk assessment"
+```
+
+### Slash Command Setup
+
+The slash commands are automatically configured via files in `.claude/commands/`:
+- `.claude/commands/product-manager.md`
+- `.claude/commands/technical-pm.md`  
+- `.claude/commands/senior-engineer.md`
+- `.claude/commands/coding-agent.md`
+- `.claude/commands/pm.md` (short version)
+- `.claude/commands/se.md` (short version)
+- `.claude/commands/ca.md` (short version)
+
+## Usage Commands (Alternative)
+
+If slash commands aren't working, use these full commands for your development workflow:
 
 ### Step 1: PRD to Phase Document (Technical PM)
 ```bash
@@ -102,6 +146,15 @@ Ensure these files exist before running agent creation:
 - `.claude/agents/senior-engineer/invoice-processing-patterns.md` ✅
 - `.claude/agents/coding-agent/instructions.md` ✅
 
+### Slash Command Files (Auto-configured)
+- `.claude/commands/product-manager.md` ✅ (Auto-created)
+- `.claude/commands/technical-pm.md` ✅ (Auto-created) 
+- `.claude/commands/senior-engineer.md` ✅ (Auto-created)
+- `.claude/commands/coding-agent.md` ✅ (Auto-created)
+- `.claude/commands/pm.md` ✅ (Short alias)
+- `.claude/commands/se.md` ✅ (Short alias) 
+- `.claude/commands/ca.md` ✅ (Short alias)
+
 ### Documentation Files
 - `docs/SETUP - Technical PM Agent.md` ✅
 - `docs/SETUP - Sr Engineer Agent.md` ✅
@@ -128,6 +181,7 @@ Ensure these files exist before running agent creation:
 
 After setup, you should be able to:
 - ✅ List all three agents with `claude-code agent list`
+- ✅ Use slash commands like `/pm`, `/se`, `/ca` for quick agent access
 - ✅ Run Technical PM agent to create phase documents from PRDs
 - ✅ Run Senior Engineer agent to create TDD tasks from phases
 - ✅ Run Coding Agent to implement tasks with algorithmic patterns
@@ -148,6 +202,12 @@ After setup, you should be able to:
 ### Model Not Available
 - Check model names are correct and available in your Claude Code plan
 - Try alternative model versions if needed
+
+### Slash Commands Not Working
+- Verify `.claude/commands/` directory exists with all 7 command files
+- Check that command files have `.md` extension and correct content
+- Test with a simple command like `/pm "test"` to verify recognition
+- Fallback to full `claude-code agent run` commands if needed
 
 ## Next Steps
 

@@ -3,18 +3,18 @@ Basic regression test to verify existing vendor processing still works
 after Creative-Coop XS-code pattern updates
 """
 
-import sys
 import os
 import re
+import sys
 
 # Add parent directory to path to import main
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from main import (
-    extract_creative_coop_product_codes,
-    extract_creative_coop_product_upc_pairs,
     CREATIVE_COOP_PRODUCT_CODE_PATTERN,
     CREATIVE_COOP_PRODUCT_UPC_PATTERN,
+    extract_creative_coop_product_codes,
+    extract_creative_coop_product_upc_pairs,
 )
 
 

@@ -7,21 +7,22 @@ GREEN phase: Will be updated after pattern fixes
 REFACTOR phase: Will test centralized pattern functions
 """
 
-import pytest
-import re
 import json
-import sys
 import os
+import re
+import sys
+
+import pytest
 
 # Add parent directory to path to import main
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from main import (
     extract_creative_coop_product_mappings_corrected,
-    process_creative_coop_document,
     extract_line_items_from_entities,
-    split_combined_line_item,
     extract_upc_from_text,
+    process_creative_coop_document,
+    split_combined_line_item,
 )
 
 
@@ -533,11 +534,12 @@ class TestCentralizedHelperFunctions:
 
     def test_centralized_pattern_constants(self):
         """REFACTOR: Test centralized pattern constants"""
+        import re
+
         from main import (
             CREATIVE_COOP_PRODUCT_CODE_PATTERN,
             CREATIVE_COOP_PRODUCT_UPC_PATTERN,
         )
-        import re
 
         # Test product code pattern
         test_text = "XS9826A DA1234A XS8911 DB5678B"
@@ -565,11 +567,12 @@ class TestCentralizedHelperFunctions:
 
     def test_helper_functions_performance(self):
         """REFACTOR: Test helper functions performance"""
+        import time
+
         from main import (
             extract_creative_coop_product_codes,
             extract_creative_coop_product_upc_pairs,
         )
-        import time
 
         # Large text with many codes
         large_text = " ".join(

@@ -3,6 +3,7 @@
 Quick test of Google Sheets integration with Harpercollins invoice
 """
 import json
+
 from main import *
 
 # Load the Harpercollins Document AI output
@@ -37,8 +38,8 @@ print(f"\nExtracted {len(rows)} line items")
 
 # Write to Google Sheets
 try:
-    from googleapiclient.discovery import build
     from google.auth import default
+    from googleapiclient.discovery import build
 
     credentials, _ = default()
     service = build("sheets", "v4", credentials=credentials)

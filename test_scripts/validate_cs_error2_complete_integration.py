@@ -9,17 +9,16 @@ This script runs the complete end-to-end validation of Creative-Coop processing
 and provides production-readiness assessment.
 """
 
-import json
 import csv
-import time
+import json
 import os
 import sys
+import time
 
 # Add project root to Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from main import process_creative_coop_document, detect_vendor_type
-
+from main import detect_vendor_type, process_creative_coop_document
 
 # Expected results from manual PDF analysis of CS003837319_Error 2.PDF
 EXPECTED_CS_ERROR2_RESULTS = [

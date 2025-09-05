@@ -3,6 +3,7 @@
 Test the integrated main.py with HarperCollins processing
 """
 import json
+
 from main import *
 
 # Test with HarperCollins document

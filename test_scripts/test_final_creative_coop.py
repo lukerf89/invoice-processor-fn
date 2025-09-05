@@ -2,8 +2,9 @@
 """
 Test final Creative-Coop processing to generate the expected output
 """
-import json
 import csv
+import json
+
 from main import *
 
 # Load the Creative-Coop document

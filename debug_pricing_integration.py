@@ -3,16 +3,16 @@
 Debug script to understand why pricing integration is failing in CS Error 2 processing
 """
 import json
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from main import (
-    process_creative_coop_document,
+    extract_creative_coop_product_mappings_corrected,
     extract_creative_coop_quantity_improved,
     extract_wholesale_price,
-    extract_creative_coop_product_mappings_corrected,
+    process_creative_coop_document,
 )
 
 

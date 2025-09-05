@@ -7,12 +7,12 @@ This implements TDD RED phase with comprehensive failing tests for the complete
 CS003837319_Error 2.PDF processing pipeline, validating data quality, accuracy, and format.
 """
 
-import pytest
-import json
 import csv
+import json
 import time
 from unittest.mock import Mock
 
+import pytest
 
 # Expected data from manual PDF analysis of CS003837319_Error 2.PDF
 EXPECTED_CS_ERROR2_PRODUCTS = [
@@ -435,10 +435,11 @@ def test_cs_error2_accuracy_benchmark():
 
 def test_cs_error2_tier_usage_validation():
     """Test that the new multi-tier extraction is being used"""
-    from main import extract_creative_coop_quantity_improved
     import io
     import sys
     from contextlib import redirect_stdout
+
+    from main import extract_creative_coop_quantity_improved
 
     # Sample products from CS Error 2 in tabular format
     tabular_sample = 'XS9826A 191009727774 6"H Metal Ballerina Ornament, 24 0 0 24 each 2.00 1.60 38.40'

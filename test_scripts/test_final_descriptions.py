@@ -2,8 +2,9 @@
 """
 Final test of improved description formatting with comparison
 """
-import json
 import csv
+import json
+
 from main import *
 
 # Test with Creative-Coop document

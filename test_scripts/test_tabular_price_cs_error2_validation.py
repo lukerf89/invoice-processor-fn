@@ -7,16 +7,16 @@ with the actual CS003837319_Error 2 Document AI output to extract wholesale pric
 """
 
 import json
-import sys
 import os
+import sys
 
 # Add parent directory to path to import main module
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from main import (
-    extract_price_from_table_columns,
     extract_creative_coop_product_codes,
     extract_creative_coop_product_upc_pairs,
+    extract_price_from_table_columns,
 )
 
 

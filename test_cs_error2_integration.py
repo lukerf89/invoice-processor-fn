@@ -4,10 +4,11 @@ Task 08: Integration test for CS003837319_Error 2.PDF processing
 Tests the integration of multi-tier price extraction with Creative-Coop processing
 """
 
-import json
 import csv
+import json
 import time
-from main import process_creative_coop_document, detect_vendor_type
+
+from main import detect_vendor_type, process_creative_coop_document
 
 
 def load_cs_error2_document():

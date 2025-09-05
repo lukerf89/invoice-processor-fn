@@ -38,7 +38,7 @@ for isbn, title, price, qty in expected_data:
 print(f"\nTotal expected items: {len(expected_data)}")
 
 # Convert date 04/29/25 to Excel serial number
-from datetime import datetime, date
+from datetime import date, datetime
 
 target_date = date(2025, 4, 29)
 excel_epoch = date(1900, 1, 1)

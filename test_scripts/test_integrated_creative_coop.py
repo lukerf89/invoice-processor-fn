@@ -2,8 +2,9 @@
 """
 Test integrated Creative Coop processing in main.py
 """
-import json
 import csv
+import json
+
 from main import *
 
 # Load the Creative-Coop document

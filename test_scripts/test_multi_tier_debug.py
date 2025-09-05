@@ -3,16 +3,16 @@
 Debug multi-tier price extraction issues
 """
 
-import sys
 import os
+import sys
 
 # Add parent directory to path for importing main
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from main import (
-    extract_price_from_table_columns,
     extract_creative_coop_price_improved,
-    extract_wholesale_price,
     extract_price_from_context,
+    extract_price_from_table_columns,
+    extract_wholesale_price,
 )
 
 

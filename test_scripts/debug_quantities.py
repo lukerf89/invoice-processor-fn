@@ -4,8 +4,10 @@ Debug quantity extraction issues
 """
 import json
 import re
-from main import *
+
 from google.cloud import documentai_v1 as documentai
+
+from main import *
 
 # Test with Creative-Coop document
 with open("test_invoices/Creative-Coop_CI004848705_docai_output.json", "r") as f:

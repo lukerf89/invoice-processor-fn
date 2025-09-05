@@ -3,6 +3,7 @@
 Debug description extraction to see why we're getting incomplete titles
 """
 import json
+
 from google.cloud import documentai_v1 as documentai
 
 with open("test_invoices/Harpercollins_04-29-2025_docai_output.json", "r") as f:

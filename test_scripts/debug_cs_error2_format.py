@@ -4,9 +4,9 @@ Debug script to analyze CS Error 2 document format for tabular price extraction
 """
 
 import json
+import os
 import re
 import sys
-import os
 
 # Add parent directory to path to import main module
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

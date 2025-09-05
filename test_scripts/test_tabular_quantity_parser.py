@@ -7,9 +7,10 @@ This implements TDD RED phase with comprehensive failing tests for the new
 tabular quantity extraction algorithm.
 """
 
-import pytest
 import time
 from unittest.mock import Mock, patch
+
+import pytest
 
 
 def test_extract_quantity_from_table_columns_basic_case():

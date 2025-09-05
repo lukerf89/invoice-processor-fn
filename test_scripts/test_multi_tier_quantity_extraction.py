@@ -7,9 +7,10 @@ This implements TDD RED phase with comprehensive failing tests for the new
 multi-tier fallback system that integrates tabular parsing with existing logic.
 """
 
-import pytest
 import time
 from unittest.mock import Mock, patch
+
+import pytest
 
 
 def test_tier1_tabular_extraction_success():
@@ -168,10 +169,11 @@ def test_integration_with_process_creative_coop_document():
 
 def test_tier_logging_and_debugging():
     """Test that tier selection is logged for debugging"""
-    from main import extract_creative_coop_quantity_improved
     import io
     import sys
     from contextlib import redirect_stdout
+
+    from main import extract_creative_coop_quantity_improved
 
     # Capture output
     log_output = io.StringIO()

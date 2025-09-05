@@ -4,10 +4,11 @@ Task 11: Multi-Tier Price Extraction Integration - Creative-Coop
 RED Phase - Write failing tests for multi-tier price extraction integration
 """
 
-import pytest
-from unittest.mock import Mock, patch
-import sys
 import os
+import sys
+from unittest.mock import Mock, patch
+
+import pytest
 
 # Add parent directory to path for importing main
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -260,11 +261,11 @@ def test_logging_and_debugging():
 
     # This test will FAIL initially because extract_creative_coop_price_improved doesn't exist
     try:
-        from main import extract_creative_coop_price_improved
-
         import io
         import sys
         from contextlib import redirect_stdout
+
+        from main import extract_creative_coop_price_improved
 
         text = """
         XS9826A | 191009727774 | Product | 24 | 0 | 0 | 24 | each | 2.00 | 1.60 | 38.40

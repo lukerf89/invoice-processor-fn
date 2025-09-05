@@ -2,8 +2,8 @@
 """
 Debug script to test CS003837319_Error 2.PDF processing and check column alignment
 """
-import json
 import csv
+import json
 import os
 import sys
 
@@ -11,12 +11,12 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from main import (
-    process_creative_coop_document,
     detect_vendor_type,
-    extract_line_items_from_entities,
     extract_line_items,
+    extract_line_items_from_entities,
     extract_line_items_from_text,
     format_date,
+    process_creative_coop_document,
 )
 
 

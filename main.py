@@ -11,7 +11,6 @@ from google.auth import default
 from google.cloud import documentai_v1 as documentai
 from googleapiclient.discovery import build
 
-
 # REFACTOR: Centralized Creative-Coop pattern constants
 # These patterns detect D-codes (DA1234A), XS-codes (XS9826A), and legacy formats (ST1234, WT5678)
 CREATIVE_COOP_PRODUCT_CODE_PATTERN = r"\b((?:D[A-Z]\d{4}|XS\d+|[A-Z]{2}\d{4})[A-Z]?)\b"

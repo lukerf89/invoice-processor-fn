@@ -3,6 +3,7 @@
 Test Creative-Coop invoice processing
 """
 import json
+
 from main import *
 
 # Test with Creative-Coop document

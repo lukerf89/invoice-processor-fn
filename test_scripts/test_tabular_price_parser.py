@@ -7,11 +7,12 @@ This file implements comprehensive failing tests for Creative-Coop
 tabular format price extraction as specified in Task 10.
 """
 
-import pytest
-import time
-import sys
 import os
+import sys
+import time
 from unittest.mock import Mock
+
+import pytest
 
 # Add parent directory to path to import main module
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

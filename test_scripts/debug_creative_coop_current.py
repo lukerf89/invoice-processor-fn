@@ -3,6 +3,7 @@
 Debug current Creative-Coop processing to see filtering behavior
 """
 import json
+
 from main import *
 
 # Load the Creative-Coop document

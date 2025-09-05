@@ -4,8 +4,8 @@ GREEN phase test to verify CS003837319_Error 2.PDF processes successfully
 """
 
 import json
-import sys
 import os
+import sys
 
 # Add parent directory to path to import main
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
