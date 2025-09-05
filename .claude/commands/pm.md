@@ -1,0 +1,1 @@
+Please use the product-manager agent to create a PRD: $ARGUMENTS
