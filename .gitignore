@@ -37,6 +37,9 @@ ENV/
 *.swp
 *.swo
 
+# Claude Code settings (local configuration)
+.claude/settings.local.json
+
 # OS
 .DS_Store
 ._*
