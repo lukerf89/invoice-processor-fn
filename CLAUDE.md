@@ -24,7 +24,7 @@ This is a Google Cloud Function that processes invoices using a multi-tier AI ap
 
 ## Tech Stack
 
-- **Runtime**: Python 3.12+ 
+- **Runtime**: Python 3.12+
 - **Framework**: Google Cloud Functions with functions-framework
 - **Cloud Services**: Google Cloud Document AI, Google Sheets API, Google Gemini AI, Secret Manager
 - **Key Dependencies**: google-cloud-documentai, google-generativeai, google-auth, google-api-python-client, requests, flask
@@ -218,7 +218,7 @@ gcloud functions deploy process_invoice \
 - **Performance**: Sub-second processing with optimized memory usage and comprehensive error handling
 - **Validation**: Extensive test suite with production readiness validation and regression testing
 
-### Gemini AI Status: 🚧 TEMPORARILY DISABLED  
+### Gemini AI Status: 🚧 TEMPORARILY DISABLED
 - **Reason**: Timeout issues with Zapier's 160-second limit
 - **Current Behavior**: Function immediately falls back to Document AI
 - **Performance**: Document AI completes within timeout limits with enhanced processing
@@ -257,7 +257,7 @@ gcloud functions deploy process_invoice \
 2. Ensure Google Sheets range matches data structure
 3. Check that `range=f"'{sheet_name}'!B:G"` is consistent across all append calls
 
-**Testing Philosophy**: 
+**Testing Philosophy**:
 - All processing logic must be algorithmic and pattern-based
 - Test scripts validate logic works across different invoice formats
 - Debug scripts help identify patterns for new invoice types
@@ -516,15 +516,19 @@ The project uses automated code formatting and quality checks:
   - Runs `black . && isort . --profile black` automatically
   - Ensures consistent formatting without manual intervention
   - Prevents GitHub Actions lint failures
-- **Pre-commit hooks**: Automated checks on commit including:
-  - pytest tests
-  - Conventional commits format
-  - Trailing whitespace removal
-  - End of file fixer
-  - Large file checks
-  - Black and isort formatting
+- **Pre-commit hooks**: ✅ **FULLY CONFIGURED** - Automated checks on every commit:
+  - **pytest tests**: Prevents commits with failing tests
+  - **Conventional commits format**: Enforces proper commit message format (feat:, fix:, etc.)
+  - **Black formatting**: Auto-formats Python code to PEP 8 standards
+  - **isort import sorting**: Organizes imports alphabetically with proper grouping
+  - **Trailing whitespace removal**: Cleans up whitespace issues
+  - **End of file fixer**: Ensures files end with newlines
+  - **Large file checks**: Prevents accidental large file commits
+  - **YAML validation**: Validates YAML file syntax
 
 **GitHub Actions**: CI/CD pipeline runs Black and isort checks on push/PR
+
+**Pre-commit Installation**: ✅ Hooks installed and active in repository
 
 **Manual Formatting**: If needed, run formatting manually:
 ```bash
