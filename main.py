@@ -12,6 +12,39 @@ from google.cloud import documentai_v1 as documentai
 from googleapiclient.discovery import build
 
 
+# REFACTOR: Centralized Creative-Coop pattern constants
+# These patterns detect D-codes (DA1234A), XS-codes (XS9826A), and legacy formats (ST1234, WT5678)
+CREATIVE_COOP_PRODUCT_CODE_PATTERN = r"\b((?:D[A-Z]\d{4}|XS\d+|[A-Z]{2}\d{4})[A-Z]?)\b"
+CREATIVE_COOP_PRODUCT_UPC_PATTERN = (
+    r"\b((?:D[A-Z]\d{4}|XS\d+|[A-Z]{2}\d{4})[A-Z]?)\s+(\d{12})"
+)
+
+
+def extract_creative_coop_product_codes(text):
+    """Extract Creative-Coop product codes (D-codes and XS-codes) from text
+
+    Args:
+        text (str): Text to search for product codes
+
+    Returns:
+        list: List of product codes found (e.g., ['XS9826A', 'DA1234A'])
+    """
+    return re.findall(CREATIVE_COOP_PRODUCT_CODE_PATTERN, text)
+
+
+def extract_creative_coop_product_upc_pairs(text):
+    """Extract Creative-Coop product-UPC pairs from text
+
+    Args:
+        text (str): Text to search for product-UPC pairs
+
+    Returns:
+        list: List of tuples (product_code, upc_code)
+              e.g., [('XS9826A', '191009727774'), ('DA1234A', '123456789012')]
+    """
+    return re.findall(CREATIVE_COOP_PRODUCT_UPC_PATTERN, text)
+
+
 def process_with_gemini_first(pdf_content):
     """Try Gemini AI first for invoice processing"""
 
@@ -793,6 +826,389 @@ def extract_wholesale_price(full_text):
     return None
 
 
+def extract_price_from_table_columns(text, product_code):
+    """
+    Enhanced tabular price extraction from Creative-Coop formats.
+
+    Handles two formats:
+    1. Multi-line format (CS Error 2):
+       XS9826A
+       191009727774
+       6"H Metal Ballerina Ornament,
+       24
+       0
+       0
+       24
+       each
+       2.00       <- List Price
+       1.60       <- Your Price (wholesale)
+       38.40      <- Extended Price
+
+    2. Pipe-separated format:
+       Product Code | UPC | Description | Qty Ord | ... | List Price | Your Price | ...
+       XS9826A | 191009727774 | Product | 24 | ... | 2.00 | 1.60 | ...
+
+    Args:
+        text (str): Document text containing tabular data
+        product_code (str): Product code to find price for (e.g., "XS9826A")
+
+    Returns:
+        float: Extracted wholesale price, or None if not found/invalid
+    """
+
+    if not text or not product_code:
+        return None
+
+    # First try pipe-separated format
+    price = _extract_from_pipe_format(text, product_code)
+    if price is not None:
+        return price
+
+    # Fallback to multi-line format
+    return _extract_from_multiline_format(text, product_code)
+
+
+def _extract_from_pipe_format(text, product_code):
+    """Extract price from pipe-separated tabular format"""
+    lines = text.split("\n")
+
+    for line in lines:
+        # Skip header lines and empty lines
+        if not line.strip() or "Product Code" in line or "|" not in line:
+            continue
+
+        # Split by pipe separator
+        columns = [col.strip() for col in line.split("|")]
+
+        # Basic validation: should have at least 10 columns for tabular format
+        if len(columns) < 10:
+            continue
+
+        # Check if this line contains our product code (first column)
+        if columns[0] == product_code:
+            # Price is in 10th column (index 9): "Your Price"
+            price_text = columns[9].strip()
+
+            # Clean price text (remove currency symbols, whitespace)
+            price_text = (
+                price_text.replace("$", "").replace("€", "").replace(",", "").strip()
+            )
+
+            # Handle N/A, empty, or invalid values
+            if not price_text or price_text.upper() in ["N/A", "INVALID", "NULL"]:
+                return None
+
+            try:
+                price = float(price_text)
+                return price
+            except ValueError:
+                return None
+
+    return None
+
+
+def _extract_from_multiline_format(text, product_code):
+    """Extract price from multi-line Creative-Coop format"""
+    lines = text.split("\n")
+
+    # Find the line containing the product code
+    for i, line in enumerate(lines):
+        if line.strip() == product_code:
+            # Found product code line, now look for prices in subsequent lines
+            # The pattern is: Product Code, UPC, Description, quantities, unit, List Price, Your Price, Extended Price
+
+            # Look ahead for price patterns (decimal numbers)
+            prices_found = []
+            price_line_indices = []
+
+            # Search next 15 lines for price patterns
+            for j in range(i + 1, min(len(lines), i + 16)):
+                line_text = lines[j].strip()
+
+                # Check if this line contains a price (decimal number)
+                if re.match(r"^\d+\.\d{2}$", line_text):
+                    try:
+                        price = float(line_text)
+                        if 0.01 <= price <= 10000.0:  # Reasonable price range
+                            prices_found.append(price)
+                            price_line_indices.append(j)
+                    except ValueError:
+                        continue
+
+                # Stop if we hit another product code or section
+                if (
+                    re.match(r"^[A-Z]{2}\d+[A-Z]?$", line_text)
+                    and line_text != product_code
+                ):
+                    break
+
+            # Analyze the prices found
+            if len(prices_found) >= 2:
+                # In Creative-Coop format, we expect:
+                # 1st price: List Price
+                # 2nd price: Your Price (wholesale) <- This is what we want
+                # 3rd price: Extended Price
+
+                # The wholesale price is typically the 2nd price
+                wholesale_price = (
+                    prices_found[1] if len(prices_found) >= 2 else prices_found[0]
+                )
+                return wholesale_price
+
+            elif len(prices_found) == 1:
+                # Only one price found, assume it's the wholesale price
+                return prices_found[0]
+
+    return None
+
+
+def extract_price_from_context(text, product_code):
+    """
+    Context-aware price extraction for complex Creative-Coop formats.
+
+    Looks for price information near product code mentions using
+    various context patterns.
+
+    Args:
+        text (str): Document text containing pricing information
+        product_code (str): Product code to find price for
+
+    Returns:
+        float: Extracted price, or None if not found
+    """
+    import re
+
+    if not text or not product_code:
+        return None
+
+    # Look for price context patterns near product code
+    price_patterns = [
+        # "Wholesale Price: $1.60"
+        rf"{re.escape(product_code)}.*?wholesale\s+price:?\s*\$?(\d+\.?\d*)",
+        # "Unit Price: $12.50"
+        rf"{re.escape(product_code)}.*?unit\s+price:?\s*\$?(\d+\.?\d*)",
+        # "Price per unit: $8.00"
+        rf"{re.escape(product_code)}.*?price\s+per\s+unit:?\s*\$?(\d+\.?\d*)",
+        # "Your Price: $1.60" (multi-line context)
+        rf"{re.escape(product_code)}.*?your\s+price:?\s*\$?(\d+\.?\d*)",
+    ]
+
+    for pattern in price_patterns:
+        matches = re.finditer(pattern, text, re.IGNORECASE | re.DOTALL)
+        for match in matches:
+            try:
+                price = float(match.group(1))
+                if 0.0 <= price <= 10000.0:  # Reasonable price range
+                    return price
+            except (ValueError, IndexError):
+                continue
+
+    return None
+
+
+def _extract_product_specific_price(text, product_code):
+    """
+    Extract price for specific product from pattern-based text.
+
+    Looks for patterns like:
+    - "DF6802 Ceramic Vase 8 0 Set $12.50 wholesale $100.00"
+    - "ST1234 Cotton Throw 6 0 each $8.00 retail"
+    """
+    import re
+
+    if not text or not product_code:
+        return None
+
+    # Pattern to find product line with prices
+    # Look for product code followed by description and multiple prices
+    pattern = rf"{re.escape(product_code)}\s+.*?\$(\d+\.?\d*)"
+
+    matches = re.finditer(pattern, text, re.IGNORECASE)
+    prices_found = []
+
+    for match in matches:
+        # Find the line containing this product
+        line_start = text.rfind("\n", 0, match.start()) + 1
+        line_end = text.find("\n", match.end())
+        if line_end == -1:
+            line_end = len(text)
+
+        line_text = text[line_start:line_end]
+
+        # Extract all prices from this line
+        price_pattern = r"\$(\d+\.?\d*)"
+        line_prices = re.findall(price_pattern, line_text)
+
+        for price_str in line_prices:
+            try:
+                price = float(price_str)
+                if 0.01 <= price <= 500.0:  # Reasonable wholesale price range
+                    prices_found.append(price)
+            except ValueError:
+                continue
+
+    # If we found multiple prices, try to identify the wholesale price
+    if len(prices_found) >= 2:
+        # In patterns like "DF6802 Ceramic Vase 8 0 Set $12.50 wholesale $100.00"
+        # The first reasonable price is often the wholesale price
+        return (
+            prices_found[0] if prices_found[0] < prices_found[-1] else prices_found[1]
+        )
+    elif len(prices_found) == 1:
+        return prices_found[0]
+
+    return None
+
+
+def extract_creative_coop_price_improved(text, product_code):
+    """
+    Multi-tier price extraction for Creative-Coop invoices.
+
+    Tier 1: Tabular column parsing for structured invoices
+    Tier 2: Pattern-based extraction for formatted text
+    Tier 3: Context-aware parsing for mixed formats
+
+    Args:
+        text (str): Document text containing pricing information
+        product_code (str): Product code to find price for
+
+    Returns:
+        float: Extracted wholesale price, or None if not found
+    """
+
+    if not text or not product_code:
+        return None
+
+    print(f"Price extraction for {product_code} using multi-tier approach")
+
+    # Tier 1: Try tabular extraction first
+    print("  Tier 1: Attempting tabular column parsing...")
+    price = extract_price_from_table_columns(text, product_code)
+    if price is not None:
+        print(f"  ✅ Tier 1 SUCCESS: Found price ${price} in tabular format")
+        return price
+
+    print("  ❌ Tier 1 failed: No tabular format detected")
+
+    # Tier 2: Fallback to existing pattern-based extraction
+    print("  Tier 2: Attempting pattern-based extraction...")
+    # First try product-specific pattern matching
+    price = _extract_product_specific_price(text, product_code)
+    if price is not None:
+        print(f"  ✅ Tier 2 SUCCESS: Found price ${price} in product-specific pattern")
+        return price
+
+    # Fallback to general pattern extraction
+    price_str = extract_wholesale_price(text)
+    if price_str is not None:
+        # Convert string format like "$2.50" to float
+        try:
+            price = float(price_str.replace("$", ""))
+            if price > 0:
+                print(
+                    f"  ✅ Tier 2 SUCCESS: Found price ${price} in general pattern format"
+                )
+                return price
+        except (ValueError, AttributeError):
+            pass
+
+    print("  ❌ Tier 2 failed: No pattern matches found")
+
+    # Tier 3: Context-aware extraction
+    print("  Tier 3: Attempting context-aware extraction...")
+    price = extract_price_from_context(text, product_code)
+    if price is not None:
+        print(f"  ✅ Tier 3 SUCCESS: Found price ${price} in context format")
+        return price
+
+    print(f"  ❌ All tiers failed: No price found for {product_code}")
+    return None
+
+
+def extract_creative_coop_quantity_from_price_context(text, product_code):
+    """
+    Extract quantity from the same tabular context where we find prices.
+
+    This function looks for price context first, then finds the quantity
+    that appears in the same tabular section, which is more reliable than
+    trying to find quantity near the product code definition.
+
+    Args:
+        text (str): Document text
+        product_code (str): Product code to find quantity for
+
+    Returns:
+        int: Extracted quantity, or None if not found
+    """
+    import re
+
+    if not text or not product_code:
+        return None
+
+    # Look for price patterns first to establish context
+    lines = text.split("\n")
+
+    # Find lines with price patterns that could be for this product
+    price_contexts = []
+
+    for i, line in enumerate(lines):
+        # Look for decimal prices (your price column)
+        if re.search(r"\b\d+\.\d{2}\b", line):
+            try:
+                price_val = float(re.search(r"\b(\d+\.\d{2})\b", line).group(1))
+                # Store context around this price
+                price_contexts.append(
+                    {
+                        "line_index": i,
+                        "price": price_val,
+                        "context_start": max(0, i - 10),
+                        "context_end": min(len(lines), i + 3),
+                    }
+                )
+            except:
+                continue
+
+    # For each price context, check if we can find our product and extract quantity
+    for context in price_contexts:
+        context_lines = lines[context["context_start"] : context["context_end"]]
+        context_text = "\n".join(context_lines)
+
+        # Check if this context might be for our product by looking for the product code
+        # in a reasonable vicinity (within 50 lines before the price)
+        product_found = False
+        for check_line in lines[
+            max(0, context["line_index"] - 50) : context["line_index"]
+        ]:
+            if product_code in check_line:
+                product_found = True
+                break
+
+        if product_found:
+            # Look backwards from price to find quantity pattern:
+            # Pattern: [qty] [0] [0] [ordered_qty] [each] [list_price] [your_price]
+            price_line_idx = context["line_index"] - context["context_start"]
+
+            # Look for quantity pattern before the price
+            for offset in range(1, min(8, price_line_idx + 1)):
+                check_idx = price_line_idx - offset
+                if check_idx >= 0 and check_idx < len(context_lines):
+                    line = context_lines[check_idx].strip()
+
+                    # Look for quantity followed by "each" pattern
+                    if line.isdigit():
+                        qty = int(line)
+                        # Check if next few lines have "each" pattern
+                        if check_idx + 1 < len(context_lines):
+                            next_line = context_lines[check_idx + 1].strip()
+                            if next_line == "each" and 0 < qty <= 1000:
+                                print(
+                                    f"  Found quantity {qty} for {product_code} in price context"
+                                )
+                                return qty
+
+    return None
+
+
 def extract_shipped_quantity(full_text):
     """Extract shipped quantity from patterns like '8 00' or '24\n24'"""
     # Remove product codes and descriptions first to focus on numbers
@@ -905,6 +1321,234 @@ def extract_creative_coop_quantity(text, product_code):
     return None
 
 
+def extract_quantity_from_table_columns(text, product_code):
+    """
+    Extract quantity from Creative-Coop tabular format with improved parsing.
+
+    Handles multiple formats:
+    1. Single line: "XS9826A 191009727774 Description 24 0 0 24 each 2.00 1.60 38.40"
+    2. Multi-line: Product code and data on separate lines
+    3. Wrapped descriptions: Handle text wrapping in descriptions
+
+    Args:
+        text (str): Invoice text containing product line
+        product_code (str): Product code to find (e.g., "XS9826A")
+
+    Returns:
+        int: Ordered quantity, None if not found or parsing fails
+    """
+    if not text or not product_code or product_code not in text:
+        return None
+
+    try:
+        # Strategy 1: Try single-line parsing first
+        qty = _parse_single_line_quantity(text, product_code)
+        if qty is not None:
+            return qty
+
+        # Strategy 2: Try multi-line parsing for formatted invoices
+        return _parse_multiline_quantity(text, product_code)
+
+    except Exception as e:
+        # Log parsing error but don't fail completely
+        print(f"Warning: Quantity parsing failed for {product_code}: {e}")
+        return None
+
+
+def _parse_single_line_quantity(text, product_code):
+    """Parse quantity from single line format"""
+    lines = text.split("\n")
+    for line in lines:
+        if product_code in line and len(line.split()) >= 8:  # Minimum expected columns
+            parts = line.split()
+            # Find quantity pattern: first integer after UPC that's followed by more integers
+            return _extract_quantity_from_parts(parts, product_code)
+    return None
+
+
+def _parse_multiline_quantity(text, product_code):
+    """Parse quantity from multi-line Creative-Coop format"""
+    lines = text.split("\n")
+    product_line_index = -1
+
+    # Find product code line
+    for i, line in enumerate(lines):
+        if product_code == line.strip():
+            product_line_index = i
+            break
+
+    if product_line_index == -1:
+        return None
+
+    # Look for quantity in the next 10 lines after product code
+    upc_found = False
+
+    for i in range(product_line_index + 1, min(product_line_index + 10, len(lines))):
+        line = lines[i].strip()
+
+        if line.isdigit():
+            # Skip UPC (12-digit number)
+            if len(line) == 12 and not upc_found:
+                upc_found = True
+                continue
+
+            # Skip other long numbers that could be UPCs from other products
+            if len(line) >= 10:
+                continue
+
+            # Valid quantity should be:
+            # 1. Short number (1-4 digits)
+            # 2. Reasonable quantity range (0-10000)
+            # 3. Found after UPC
+            qty = int(line)
+            if len(line) <= 4 and 0 <= qty <= 10000 and upc_found:
+                return qty
+
+        # Count non-digit lines as potential description lines
+        elif line and not line.isdigit():
+            # If we find another product code, stop searching
+            if len(line) <= 10 and line.upper().startswith(("XS", "CC", "DA")):
+                break
+
+    return None
+
+
+def _extract_quantity_from_parts(parts, product_code):
+    """Extract quantity from split line parts"""
+    try:
+        product_index = parts.index(product_code)
+
+        # Find UPC (12-digit number) after product code
+        upc_index = -1
+        for i in range(product_index + 1, len(parts)):
+            if parts[i].isdigit() and len(parts[i]) == 12:
+                upc_index = i
+                break
+
+        if upc_index == -1:
+            return None
+
+        # Find first reasonable quantity after UPC (skipping description words and other UPCs)
+        for i in range(upc_index + 1, len(parts)):
+            if parts[i].isdigit():
+                # Skip long numbers that could be UPCs
+                if len(parts[i]) >= 10:
+                    continue
+
+                qty = int(parts[i])
+                # Valid quantity should be reasonable range (0-10000) and short
+                if len(parts[i]) <= 4 and 0 <= qty <= 10000:
+                    return qty
+
+        return None
+
+    except (ValueError, IndexError):
+        return None
+
+
+def extract_creative_coop_quantity_improved(text, product_code):
+    """
+    Multi-tier quantity extraction with improved error handling and performance.
+
+    Uses a tiered approach with early exit and structured error handling:
+    - Tier 1: Tabular column parsing for structured invoices
+    - Tier 2: Pattern-based extraction for traditional formats
+    - Tier 3: Context-aware parsing for complex cases
+    """
+    if not text or not product_code or product_code not in text:
+        return None
+
+    # Define extraction strategies with metadata
+    extraction_tiers = [
+        {
+            "name": "Tabular",
+            "function": extract_quantity_from_table_columns,
+            "description": "Column-based parsing for structured invoices",
+        },
+        {
+            "name": "Pattern",
+            "function": extract_quantity_from_patterns,
+            "description": "Regex pattern matching for formatted text",
+        },
+        {
+            "name": "Context",
+            "function": extract_quantity_from_context,
+            "description": "Context-aware extraction for complex formats",
+        },
+    ]
+
+    # Try each tier in order with performance monitoring
+    for i, tier in enumerate(extraction_tiers, 1):
+        try:
+            qty = tier["function"](text, product_code)
+            if qty is not None:
+                print(
+                    f"Tier {i} ({tier['name']}): Extracted qty {qty} for {product_code}"
+                )
+                return qty
+        except Exception as e:
+            print(f"Tier {i} ({tier['name']}) failed for {product_code}: {e}")
+            continue
+
+    print(
+        f"All {len(extraction_tiers)} tiers failed: No quantity found for {product_code}"
+    )
+    return None
+
+
+def extract_quantity_from_patterns(text, product_code):
+    """
+    Tier 2: Pattern-based quantity extraction (existing logic).
+
+    Handles formats like:
+    - "DF6802 8 0 lo each $12.50"
+    - "ST1234 6 0 Set $8.00"
+    """
+    # Use existing extract_creative_coop_quantity logic but return int
+    result = extract_creative_coop_quantity(text, product_code)
+    if result and result.isdigit():
+        return int(result)
+    return None
+
+
+def extract_quantity_from_context(text, product_code):
+    """
+    Tier 3: Context-aware quantity extraction for complex formats.
+
+    Handles formats like:
+    - "Product: XS9826A\nOrdered: 24 units"
+    - Multi-line with quantity keywords
+    """
+    if not text or not product_code or product_code not in text:
+        return None
+
+    import re
+
+    # Find product code position
+    product_pos = text.find(product_code)
+
+    # Search window around product code
+    window_start = max(0, product_pos - 100)
+    window_end = min(len(text), product_pos + 300)
+    search_window = text[window_start:window_end]
+
+    # Context patterns for quantity extraction
+    context_patterns = [
+        r"Ordered:\s*(\d+)",  # "Ordered: 24"
+        r"Qty.*?:\s*(\d+)",  # "Qty Ord: 24"
+        r"Quantity.*?(\d+)",  # "Quantity 24"
+        r"\b(\d+)\s*units?\b",  # "24 units"
+        r"\b(\d+)\s*pieces?\b",  # "24 pieces"
+    ]
+
+    for pattern in context_patterns:
+        match = re.search(pattern, search_window, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+
+    return None
+
+
 def extract_best_vendor(entities):
     """Extract vendor name using confidence scores and priority order"""
     # Priority order of vendor-related entity types
@@ -976,7 +1620,7 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
 
             # Check if this line item contains multiple products
             # Creative-Coop style: Look for multiple DF/DA product codes
-            creative_coop_codes = re.findall(r"\b(D[A-Z]\d{4}[A-Z]?)\b", full_line_text)
+            creative_coop_codes = extract_creative_coop_product_codes(full_line_text)
             # Rifle Paper style: Look for multiple alphanumeric product codes with prices
             rifle_paper_codes = re.findall(
                 r"\b([A-Z0-9]{3,10})\s+\d{12}\s+\$?\d+\.\d{2}", full_line_text
@@ -1117,12 +1761,14 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                 print(f"  -> Using Document AI unit_price: '{unit_price}'")
 
             # 3. Extract shipped quantity - prioritize Creative-Coop extraction for Creative-Coop invoices
-            # Try Creative-Coop specific quantity extraction first
-            creative_coop_qty = extract_creative_coop_quantity(
+            # Try Creative-Coop specific quantity extraction first (multi-tier)
+            creative_coop_qty = extract_creative_coop_quantity_improved(
                 document.text, product_code
             )
             if creative_coop_qty is not None:
-                quantity = creative_coop_qty
+                quantity = str(
+                    creative_coop_qty
+                )  # Convert int back to string for consistency
                 print(f"  -> Found Creative-Coop quantity from document: '{quantity}'")
             else:
                 # Fallback to Document AI properties if Creative-Coop extraction fails
@@ -1777,11 +2423,12 @@ def split_combined_line_item(full_line_text, entity, document_text=None):
 
     # Pattern: Description → ProductCode → UPC → Description → ProductCode → UPC
     # Use regex to find product codes with their immediately following UPC codes (same line)
-    product_upc_pattern = r"\b(D[A-Z]\d{4}[A-Z]?)\s+(\d{12})"
+    # Use centralized pattern constant
+    product_upc_pattern = CREATIVE_COOP_PRODUCT_UPC_PATTERN
     product_upc_matches = re.findall(product_upc_pattern, full_line_text)
 
     # Also find product codes without UPC codes
-    all_product_codes = re.findall(r"\b(D[A-Z]\d{4}[A-Z]?)\b", full_line_text)
+    all_product_codes = extract_creative_coop_product_codes(full_line_text)
 
     # Split text by lines to find descriptions and UPC codes
     lines = full_line_text.split("\n")
@@ -1920,13 +2567,15 @@ def split_combined_line_item(full_line_text, entity, document_text=None):
         unit_price = ""
         quantity = ""
 
-        # Try Creative-Coop specific quantity extraction first using document text
+        # Try Creative-Coop specific quantity extraction first using document text (multi-tier)
         if document_text:
-            creative_coop_qty = extract_creative_coop_quantity(
+            creative_coop_qty = extract_creative_coop_quantity_improved(
                 document_text, product_code
             )
             if creative_coop_qty is not None:
-                quantity = creative_coop_qty
+                quantity = str(
+                    creative_coop_qty
+                )  # Convert int back to string for consistency
 
         # Fallback to entity properties for unit price
         if hasattr(entity, "properties") and entity.properties:
@@ -1993,6 +2642,13 @@ def detect_vendor_type(document_text):
     for indicator in creative_coop_indicators:
         if indicator.lower() in document_text.lower():
             return "Creative-Coop"
+
+    # Also check for Creative-Coop product code patterns (D-codes and XS-codes)
+    creative_coop_product_codes = extract_creative_coop_product_codes(document_text)
+    if (
+        len(creative_coop_product_codes) >= 2
+    ):  # If we find 2+ Creative-Coop codes, likely a Creative-Coop invoice
+        return "Creative-Coop"
 
     # Check for OneHundred80 indicators
     onehundred80_indicators = [
@@ -2179,11 +2835,40 @@ def process_harpercollins_document(document):
 def process_creative_coop_document(document):
     """Process Creative-Coop documents with comprehensive wholesale prices and ordered quantities"""
 
+    # Handle edge cases gracefully
+    if not document or not hasattr(document, "text") or document.text is None:
+        print("Warning: Document text is None or missing, returning empty results")
+        return []
+
     # Extract basic invoice info
     entities = {e.type_: e.mention_text for e in document.entities}
-    vendor = extract_best_vendor(document.entities)
+
+    # For Creative-Coop, use consistent vendor name since we've already identified this as Creative-Coop
+    vendor = "Creative-Coop"
+
+    # Try multiple approaches to extract invoice information
     invoice_number = entities.get("invoice_id", "")
+    if not invoice_number:
+        # Try alternative extraction for Creative-Coop invoice number
+        invoice_match = re.search(
+            r"Invoice\s*#?\s*:\s*([A-Z0-9]+)", document.text, re.IGNORECASE
+        )
+        if invoice_match:
+            invoice_number = invoice_match.group(1)
+
     invoice_date = format_date(entities.get("invoice_date", ""))
+    if not invoice_date:
+        # Try alternative date extraction patterns for Creative-Coop
+        date_patterns = [
+            r"Date\s*:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
+            r"Invoice\s+Date\s*:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
+            r"(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
+        ]
+        for pattern in date_patterns:
+            date_match = re.search(pattern, document.text)
+            if date_match:
+                invoice_date = format_date(date_match.group(1))
+                break
 
     print(
         f"Creative-Coop processing: Vendor={vendor}, Invoice={invoice_number}, Date={invoice_date}"
@@ -2200,7 +2885,7 @@ def process_creative_coop_document(document):
     for entity in document.entities:
         if entity.type_ == "line_item":
             entity_text = entity.mention_text
-            product_codes = re.findall(r"\b(D[A-Z]\d{4}[A-Z]?)\b", entity_text)
+            product_codes = extract_creative_coop_product_codes(entity_text)
 
             if not product_codes:
                 continue
@@ -2326,6 +3011,45 @@ def process_creative_coop_document(document):
         ordered_qty = product_data["ordered_qty"]
         wholesale_price = product_data["wholesale_price"]
 
+        # INTEGRATION: Use multi-tier price extraction if no price found
+        if not wholesale_price or wholesale_price == "$0.00":
+            print(f"  Applying multi-tier price extraction for {product_code}")
+            extracted_price = extract_creative_coop_price_improved(
+                document.text, product_code
+            )
+            if extracted_price is not None:
+                wholesale_price = f"${extracted_price:.2f}"
+                print(f"  ✅ Multi-tier extraction found price: {wholesale_price}")
+            else:
+                wholesale_price = "$0.00"
+                print(f"  ❌ Multi-tier extraction failed for {product_code}")
+
+        # INTEGRATION: Use enhanced quantity extraction if no quantity found
+        if not ordered_qty or ordered_qty == "0":
+            print(f"  Applying enhanced quantity extraction for {product_code}")
+
+            # First try the table columns method
+            extracted_qty = extract_quantity_from_table_columns(
+                document.text, product_code
+            )
+            if extracted_qty is not None and extracted_qty > 0:
+                ordered_qty = str(extracted_qty)
+                print(f"  ✅ Table columns extraction found: {ordered_qty}")
+            else:
+                # Fallback to price context method for complex cases
+                print(f"  Table columns failed, trying price context method...")
+                extracted_qty = extract_creative_coop_quantity_from_price_context(
+                    document.text, product_code
+                )
+                if extracted_qty is not None and extracted_qty > 0:
+                    ordered_qty = str(extracted_qty)
+                    print(f"  ✅ Price context extraction found: {ordered_qty}")
+                else:
+                    ordered_qty = "0"
+                    print(
+                        f"  ❌ Both quantity extraction methods failed for {product_code}"
+                    )
+
         # Ensure we have valid data
         if not wholesale_price:
             wholesale_price = "$0.00"
@@ -2356,6 +3080,112 @@ def process_creative_coop_document(document):
                 f"- Skipped {product_code}: {wholesale_price} | Qty: {ordered_qty} (zero quantity)"
             )
 
+    # FALLBACK: If few or no rows were found, try traditional D-code pattern extraction
+    all_product_codes = extract_creative_coop_product_codes(document.text)
+    processed_codes = set()
+
+    # Track which product codes we've already processed
+    for row in rows:
+        if len(row) >= 4:
+            description = row[3]
+            # Extract product code from description
+            code_match = re.search(r"\b([A-Z]{2,3}\d{4}[A-Z]?)\b", description)
+            if code_match:
+                processed_codes.add(code_match.group(1))
+
+    # If we found some products but not all, or if we found none, try traditional patterns
+    missing_codes = set(all_product_codes) - processed_codes
+    if len(rows) == 0 or (len(missing_codes) > 0 and len(all_product_codes) > 0):
+        if len(rows) == 0:
+            print(
+                "No rows found using advanced processing, trying traditional D-code patterns..."
+            )
+        else:
+            print(
+                f"Found {len(processed_codes)} products but missing {len(missing_codes)}, checking traditional patterns..."
+            )
+
+        # Process missing product codes with traditional extraction
+        for product_code in missing_codes:
+            # Use traditional quantity extraction
+            quantity = extract_creative_coop_quantity(document.text, product_code)
+
+            # If traditional patterns didn't work, try other formats
+            if not (quantity and quantity.isdigit() and int(quantity) > 0):
+                # Look for "Ordered: X units" pattern near this product
+                product_section_match = re.search(
+                    rf"{re.escape(product_code)}.*?Ordered:\s*(\d+)\s+units",
+                    document.text,
+                    re.IGNORECASE | re.DOTALL,
+                )
+                if product_section_match:
+                    quantity = product_section_match.group(1)
+                    print(
+                        f"  Found ordered quantity pattern for {product_code}: {quantity}"
+                    )
+                else:
+                    # Try general quantity patterns near the product
+                    product_section = ""
+                    lines = document.text.split("\n")
+                    for i, line in enumerate(lines):
+                        if product_code in line:
+                            # Get this line and a few following lines for context
+                            context_lines = lines[i : min(i + 5, len(lines))]
+                            product_section = "\n".join(context_lines)
+                            break
+
+                    # Look for any quantity in the product section
+                    qty_match = re.search(
+                        r"\b(\d+)\s+units?\b", product_section, re.IGNORECASE
+                    )
+                    if qty_match:
+                        quantity = qty_match.group(1)
+                        print(
+                            f"  Found general quantity pattern for {product_code}: {quantity}"
+                        )
+
+            if quantity and quantity.isdigit() and int(quantity) > 0:
+                # Use traditional price extraction
+                price = extract_wholesale_price(document.text)
+                if not price:
+                    # Try to extract price from patterns near this product
+                    # First try "at $X.XX each" pattern
+                    at_price_match = re.search(
+                        rf"{re.escape(product_code)}.*?at\s*\$(\d+\.\d{{2}})\s+each",
+                        document.text,
+                        re.IGNORECASE | re.DOTALL,
+                    )
+                    if at_price_match:
+                        price = at_price_match.group(1)
+                        print(
+                            f"  Found 'at $X each' price pattern for {product_code}: ${price}"
+                        )
+                    else:
+                        # Try general price pattern near product
+                        product_line_match = re.search(
+                            rf"{re.escape(product_code)}.*?\$?(\d+\.\d{{2}})",
+                            document.text,
+                            re.DOTALL,
+                        )
+                        if product_line_match:
+                            price = product_line_match.group(1)
+
+                if price:
+                    description = f"{product_code} - Traditional D-code format"
+                    rows.append(
+                        [
+                            invoice_date,
+                            vendor,
+                            invoice_number,
+                            description,
+                            f"${price}",
+                            quantity,
+                        ]
+                    )
+                    print(
+                        f"✓ Traditional pattern: {product_code} | ${price} | Qty: {quantity}"
+                    )
+
     print(f"Creative-Coop processing completed: {len(rows)} items with ordered qty > 0")
     return rows
 
@@ -2378,7 +3208,8 @@ def extract_creative_coop_product_mappings_corrected(document_text):
 
     # Find all UPCs and product codes with positions
     upc_pattern = r"\b(\d{12})\b"
-    product_pattern = r"\b(D[A-Z]\d{4}[A-Z]?)\b"
+    # Use centralized pattern constant
+    product_pattern = CREATIVE_COOP_PRODUCT_CODE_PATTERN
 
     upc_matches = list(re.finditer(upc_pattern, table_section))
     product_matches = list(re.finditer(product_pattern, table_section))

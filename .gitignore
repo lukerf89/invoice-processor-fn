@@ -37,8 +37,11 @@ ENV/
 *.swp
 *.swo
 
-# Claude Code settings (local configuration)
+# Claude Code settings - local configuration only
 .claude/settings.local.json
+
+# Keep agent .md files in repo, but ignore any runtime state
+# Agents are recreated from .md files by setup script
 
 # OS
 .DS_Store
@@ -54,6 +57,6 @@ test_invoices/
 *.pdf
 *_docai_output.json
 
-# Development/debug files (now in test_scripts/)
-test_scripts/
+# Development/debug files - Include test_scripts in repo for development workflow
+# test_scripts/ - REMOVED from .gitignore to include in repo
 test-invoice-processor-workspace/

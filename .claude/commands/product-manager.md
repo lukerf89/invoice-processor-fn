@@ -1,0 +1,1 @@
+Please use the product-manager agent to analyze the following business requirements and create a comprehensive PRD: $ARGUMENTS
