@@ -1,0 +1,22 @@
+[
+  {
+    "test_name": "creative_coop_complete_validation",
+    "timestamp": 1757091226.380221,
+    "processing_time": 2.28889799118042,
+    "total_products": 117,
+    "unique_products": 117,
+    "unique_prices": 38,
+    "unique_quantities": 9,
+    "placeholder_count": 12,
+    "invoice_extraction_success": true,
+    "accuracy_score": 1.0,
+    "performance_score": 1.0,
+    "quality_score": 0.3333333333333333,
+    "overall_score": 0.7999999999999999,
+    "errors": [],
+    "warnings": [
+      "Placeholders: 12 <= 0",
+      "Overall score: 0.80 >= 0.85"
+    ]
+  }
+]
