@@ -11,7 +11,7 @@ from google.auth import default
 from google.cloud import documentai_v1 as documentai
 from googleapiclient.discovery import build
 
-# REFACTOR: Centralized Creative-Coop pattern constants
+# REFACTOR: Centralized Creative Co-op pattern constants
 # These patterns detect D-codes (DA1234A), XS-codes (XS9826A), and legacy formats (ST1234, WT5678)
 CREATIVE_COOP_PRODUCT_CODE_PATTERN = r"\b((?:D[A-Z]\d{4}|XS\d+|[A-Z]{2}\d{4})[A-Z]?)\b"
 CREATIVE_COOP_PRODUCT_UPC_PATTERN = (
@@ -20,7 +20,7 @@ CREATIVE_COOP_PRODUCT_UPC_PATTERN = (
 
 
 def extract_creative_coop_product_codes(text):
-    """Extract Creative-Coop product codes (D-codes and XS-codes) from text
+    """Extract Creative Co-op product codes (D-codes and XS-codes) from text
 
     Args:
         text (str): Text to search for product codes
@@ -32,7 +32,7 @@ def extract_creative_coop_product_codes(text):
 
 
 def extract_creative_coop_product_upc_pairs(text):
-    """Extract Creative-Coop product-UPC pairs from text
+    """Extract Creative Co-op product-UPC pairs from text
 
     Args:
         text (str): Text to search for product-UPC pairs
@@ -475,22 +475,22 @@ def process_invoice(request: Request):
                     document.text, invoice_date, vendor, invoice_number
                 )
                 print(f"Text extraction returned {len(rows)} rows")
-    elif vendor_type == "Creative-Coop":
-        # Use specialized Creative-Coop processing
+    elif vendor_type == "Creative Co-op":
+        # Use specialized Creative Co-op processing
         rows = process_creative_coop_document(document)
-        vendor = "Creative-Coop"
+        vendor = "Creative Co-op"
         invoice_number = entities.get("invoice_id") or "Unknown"
         invoice_date = (
             format_date(entities.get("invoice_date"))
             or extract_order_date(document.text)
             or "Unknown"
         )
-        print(f"Creative-Coop processing returned {len(rows)} rows")
+        print(f"Creative Co-op processing returned {len(rows)} rows")
 
         # Fallback to generic processing if specialized processing returns no results
         if not rows:
             print(
-                "Creative-Coop specialized processing found no items, falling back to generic processing..."
+                "Creative Co-op specialized processing found no items, falling back to generic processing..."
             )
 
             # Re-extract invoice details for fallback processing
@@ -641,14 +641,97 @@ def process_invoice(request: Request):
 
 
 def format_date(raw_date):
-    """Format date to MM/DD/YYYY format"""
+    """
+    Format date to M/D/YYYY format, handling multiple input formats including Excel serial dates.
+
+    Args:
+        raw_date: Date input in various formats (Excel serial, ISO, US format, etc.)
+
+    Returns:
+        str: Formatted date in M/D/YYYY format or empty string if invalid
+
+    Engineering Principles:
+    - Principle 2: Resilient error handling for various date formats
+    - Principle 5: Pattern-based processing for date detection
+    - Principle 7: Multi-pattern resilience with fallback strategies
+    """
+    from datetime import timedelta
+
+    # Handle empty/None inputs
     if not raw_date:
         return ""
+
+    # Convert to string and strip whitespace
+    raw_date_str = str(raw_date).strip()
+    if not raw_date_str:
+        return ""
+
+    # Check if input is an Excel serial date (numeric value)
     try:
-        parsed_date = datetime.strptime(raw_date, "%Y-%m-%d")
-        return parsed_date.strftime("%m/%d/%Y")
-    except Exception:
-        return raw_date
+        # Attempt to convert to float to check if numeric
+        date_serial = float(raw_date_str)
+
+        # Excel serial dates are typically in range 1-60000 for reasonable dates
+        # Serial 1 = January 1, 1900 (Excel's day 1)
+        # Serial 45674 = January 17, 2025 (our test case)
+        # Serial 60000 = February 6, 2064 (reasonable upper limit)
+        if 1 <= date_serial <= 60000:
+            # Convert Excel serial to datetime
+            # Excel's epoch is December 30, 1899 (accounting for 1900 leap year bug)
+            excel_epoch = datetime(1899, 12, 30)
+
+            # Add the serial number as days directly
+            # This approach handles Excel's leap year bug automatically
+
+            # Add the serial number as days to the epoch
+            try:
+                converted_date = excel_epoch + timedelta(days=date_serial)
+                # Return in M/D/YYYY format (remove leading zeros)
+                formatted = converted_date.strftime("%m/%d/%Y")
+                parts = formatted.split("/")
+                return f"{int(parts[0])}/{int(parts[1])}/{parts[2]}"
+            except (ValueError, OverflowError):
+                # Date calculation failed, fall through to string parsing
+                pass
+    except (ValueError, TypeError):
+        # Not a numeric value, proceed with string date parsing
+        pass
+
+    # Original string date parsing logic (backward compatibility)
+    try:
+        # Try ISO format first (YYYY-MM-DD)
+        parsed_date = datetime.strptime(raw_date_str, "%Y-%m-%d")
+        formatted = parsed_date.strftime("%m/%d/%Y")
+        parts = formatted.split("/")
+        return f"{int(parts[0])}/{int(parts[1])}/{parts[2]}"
+    except ValueError:
+        pass
+
+    # Try other common formats
+    date_formats = [
+        "%m/%d/%Y",  # US format with slashes
+        "%m-%d-%Y",  # US format with hyphens
+        "%Y/%m/%d",  # ISO variant with slashes
+        "%d/%m/%Y",  # European format
+        "%Y%m%d",  # Compact format
+        "%m/%d/%y",  # Two-digit year
+        "%m-%d-%y",  # Two-digit year with hyphens
+    ]
+
+    for fmt in date_formats:
+        try:
+            parsed_date = datetime.strptime(raw_date_str, fmt)
+            # Handle two-digit years
+            if parsed_date.year < 100:
+                parsed_date = parsed_date.replace(year=parsed_date.year + 2000)
+            formatted = parsed_date.strftime("%m/%d/%Y")
+            parts = formatted.split("/")
+            return f"{int(parts[0])}/{int(parts[1])}/{parts[2]}"
+        except ValueError:
+            continue
+
+    # If all parsing fails, return the original value
+    return raw_date_str
 
 
 def extract_order_number(document_text):
@@ -827,7 +910,7 @@ def extract_wholesale_price(full_text):
 
 def extract_price_from_table_columns(text, product_code):
     """
-    Enhanced tabular price extraction from Creative-Coop formats.
+    Enhanced tabular price extraction from Creative Co-op formats.
 
     Handles two formats:
     1. Multi-line format (CS Error 2):
@@ -907,7 +990,7 @@ def _extract_from_pipe_format(text, product_code):
 
 
 def _extract_from_multiline_format(text, product_code):
-    """Extract price from multi-line Creative-Coop format"""
+    """Extract price from multi-line Creative Co-op format"""
     lines = text.split("\n")
 
     # Find the line containing the product code
@@ -943,7 +1026,7 @@ def _extract_from_multiline_format(text, product_code):
 
             # Analyze the prices found
             if len(prices_found) >= 2:
-                # In Creative-Coop format, we expect:
+                # In Creative Co-op format, we expect:
                 # 1st price: List Price
                 # 2nd price: Your Price (wholesale) <- This is what we want
                 # 3rd price: Extended Price
@@ -963,7 +1046,7 @@ def _extract_from_multiline_format(text, product_code):
 
 def extract_price_from_context(text, product_code):
     """
-    Context-aware price extraction for complex Creative-Coop formats.
+    Context-aware price extraction for complex Creative Co-op formats.
 
     Looks for price information near product code mentions using
     various context patterns.
@@ -1061,7 +1144,7 @@ def _extract_product_specific_price(text, product_code):
 
 def extract_creative_coop_price_improved(text, product_code):
     """
-    Multi-tier price extraction for Creative-Coop invoices.
+    Multi-tier price extraction for Creative Co-op invoices.
 
     Tier 1: Tabular column parsing for structured invoices
     Tier 2: Pattern-based extraction for formatted text
@@ -1195,7 +1278,7 @@ def extract_tabular_price_creative_coop_enhanced(document_text, product_code):
                     except ValueError:
                         continue
 
-            # For multi-line Creative-Coop format: List Price, Your Price (wholesale), Extended Price
+            # For multi-line Creative Co-op format: List Price, Your Price (wholesale), Extended Price
             if len(prices_found) >= 2:
                 wholesale_price = prices_found[
                     1
@@ -1222,7 +1305,7 @@ def extract_tabular_price_creative_coop_enhanced(document_text, product_code):
 
 def extract_multi_tier_price_creative_coop_enhanced(document_text, product_code):
     """
-    Multi-tier price extraction for complex Creative-Coop formats.
+    Multi-tier price extraction for complex Creative Co-op formats.
 
     Tier 1: Direct tabular extraction (highest accuracy)
     Tier 2: Pattern-based extraction around product code (medium accuracy)
@@ -1512,9 +1595,9 @@ def extract_shipped_quantity(full_text):
 
 
 def extract_creative_coop_quantity(text, product_code):
-    """Extract quantity for Creative-Coop invoices using shipped/back pattern
+    """Extract quantity for Creative Co-op invoices using shipped/back pattern
 
-    For Creative-Coop invoices, intelligently match products to quantities.
+    For Creative Co-op invoices, intelligently match products to quantities.
     In combined entities, multiple products share text so we need to be careful
     about which quantity belongs to which product.
     """
@@ -1524,7 +1607,7 @@ def extract_creative_coop_quantity(text, product_code):
     # Find the product code position
     product_pos = text.find(product_code)
 
-    # Creative-Coop quantity patterns (in order of specificity)
+    # Creative Co-op quantity patterns (in order of specificity)
     qty_patterns = [
         r"\b(\d+)\s+\d+\s+lo\s+each\b",  # "8 0 lo each" - very specific
         r"\b(\d+)\s+\d+\s+Set\b",  # "6 0 Set" - specific for Set
@@ -1584,7 +1667,7 @@ def extract_creative_coop_quantity(text, product_code):
 
 def extract_quantity_from_table_columns(text, product_code):
     """
-    Extract quantity from Creative-Coop tabular format with improved parsing.
+    Extract quantity from Creative Co-op tabular format with improved parsing.
 
     Handles multiple formats:
     1. Single line: "XS9826A 191009727774 Description 24 0 0 24 each 2.00 1.60 38.40"
@@ -1628,7 +1711,7 @@ def _parse_single_line_quantity(text, product_code):
 
 
 def _parse_multiline_quantity(text, product_code):
-    """Parse quantity from multi-line Creative-Coop format"""
+    """Parse quantity from multi-line Creative Co-op format"""
     lines = text.split("\n")
     product_line_index = -1
 
@@ -1880,7 +1963,7 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
             full_line_text = entity.mention_text.strip()
 
             # Check if this line item contains multiple products
-            # Creative-Coop style: Look for multiple DF/DA product codes
+            # Creative Co-op style: Look for multiple DF/DA product codes
             creative_coop_codes = extract_creative_coop_product_codes(full_line_text)
             # Rifle Paper style: Look for multiple alphanumeric product codes with prices
             rifle_paper_codes = re.findall(
@@ -1889,7 +1972,7 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
 
             if len(creative_coop_codes) > 1:
                 print(
-                    f"  -> Found multiple Creative-Coop product codes: {creative_coop_codes}"
+                    f"  -> Found multiple Creative Co-op product codes: {creative_coop_codes}"
                 )
                 # Split this into multiple line items
                 split_items = split_combined_line_item(
@@ -2021,8 +2104,8 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
             elif not is_book_invoice:
                 print(f"  -> Using Document AI unit_price: '{unit_price}'")
 
-            # 3. Extract shipped quantity - prioritize Creative-Coop extraction for Creative-Coop invoices
-            # Try Creative-Coop specific quantity extraction first (multi-tier)
+            # 3. Extract shipped quantity - prioritize Creative Co-op extraction for Creative Co-op invoices
+            # Try Creative Co-op specific quantity extraction first (multi-tier)
             creative_coop_qty = extract_creative_coop_quantity_improved(
                 document.text, product_code
             )
@@ -2030,9 +2113,9 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                 quantity = str(
                     creative_coop_qty
                 )  # Convert int back to string for consistency
-                print(f"  -> Found Creative-Coop quantity from document: '{quantity}'")
+                print(f"  -> Found Creative Co-op quantity from document: '{quantity}'")
             else:
-                # Fallback to Document AI properties if Creative-Coop extraction fails
+                # Fallback to Document AI properties if Creative Co-op extraction fails
                 if hasattr(entity, "properties") and entity.properties:
                     for prop in entity.properties:
                         if prop.type_ == "line_item/quantity":
@@ -2062,18 +2145,18 @@ def extract_line_items_from_entities(document, invoice_date, vendor, invoice_num
                         print(f"  -> Found shipped quantity from text: '{quantity}'")
 
             # For most invoices, use the Document AI description directly as it's usually accurate
-            # Only apply cleaning for Creative-Coop style invoices or if description is missing
+            # Only apply cleaning for Creative Co-op style invoices or if description is missing
             full_description = ""
             if product_code:
                 # Check if we have a good Document AI description
                 if item_description and len(item_description) > 5:
                     # Use Document AI description directly for most vendors (like Rifle)
-                    # Only apply heavy cleaning for Creative-Coop style complex invoices
+                    # Only apply heavy cleaning for Creative Co-op style complex invoices
                     if any(
                         indicator in vendor.lower()
                         for indicator in ["creative", "coop"]
                     ):
-                        # Apply full cleaning for Creative-Coop
+                        # Apply full cleaning for Creative Co-op
                         upc_code = extract_upc_from_text(full_line_text, product_code)
                         clean_description = clean_item_description(
                             item_description, product_code, upc_code
@@ -2376,7 +2459,7 @@ def extract_upc_from_text(text, product_code=None):
 
         product_pos = text.find(product_code)
         if product_pos != -1:
-            # FIRST: Search for UPC AFTER the product code (most reliable for Creative-Coop)
+            # FIRST: Search for UPC AFTER the product code (most reliable for Creative Co-op)
             after_product = text[
                 product_pos + len(product_code) : product_pos + len(product_code) + 100
             ]
@@ -2501,7 +2584,7 @@ def clean_item_description(description, product_code, upc_code):
 def extract_description_from_full_text(full_text, product_code, upc_code):
     """Extract the actual product description from full line item text"""
 
-    # For Creative-Coop invoices, the description often appears before the product code
+    # For Creative Co-op invoices, the description often appears before the product code
     # Split by newlines to find the description in context
     lines = full_text.split("\n")
 
@@ -2529,7 +2612,7 @@ def extract_description_from_full_text(full_text, product_code, upc_code):
     if product_line_idx == 0 or product_line_idx == -1:
         # Try to find description patterns in the full text
         desc_patterns = [
-            # Specific Creative-Coop patterns
+            # Specific Creative Co-op patterns
             r'(\d+["\'-]\d+["\']?[LWH]?\s+[^\d\n]{15,})',  # "3-1/4" Rnd x 4"H 12 oz. Embossed..."
             r"(S/\d+\s+[^\d\n]{10,})",  # "S/3 11-3/4" Rnd x..."
             r"([A-Z][a-z]+[^\d\n]{15,})",  # "Stoneware Berry Basket..."
@@ -2679,7 +2762,7 @@ def split_rifle_paper_line_item(full_line_text, entity, document_text=None):
 
 
 def split_combined_line_item(full_line_text, entity, document_text=None):
-    """Split combined line items that contain multiple products (Creative-Coop style)"""
+    """Split combined line items that contain multiple products (Creative Co-op style)"""
     items = []
 
     # Pattern: Description → ProductCode → UPC → Description → ProductCode → UPC
@@ -2755,7 +2838,7 @@ def split_combined_line_item(full_line_text, entity, document_text=None):
         # Look for description - could be in several places
 
         # Case 1: FIRST try description on the same line as the product code (after the product code)
-        # This has higher priority for Creative-Coop invoices
+        # This has higher priority for Creative Co-op invoices
         if product_line_idx != -1:
             current_line = lines[product_line_idx].strip()
             # Extract description that appears after the product code on the same line
@@ -2781,7 +2864,7 @@ def split_combined_line_item(full_line_text, entity, document_text=None):
             description = lines[product_line_idx - 1].strip()
             description = " ".join(description.split())
 
-        # Case 3: For Creative-Coop, sometimes the description comes AFTER the UPC code
+        # Case 3: For Creative Co-op, sometimes the description comes AFTER the UPC code
         # Pattern: ProductCode → UPC → Description
         if (
             (not description or len(description) < 5)
@@ -2828,7 +2911,7 @@ def split_combined_line_item(full_line_text, entity, document_text=None):
         unit_price = ""
         quantity = ""
 
-        # Try Creative-Coop specific quantity extraction first using document text (multi-tier)
+        # Try Creative Co-op specific quantity extraction first using document text (multi-tier)
         if document_text:
             creative_coop_qty = extract_creative_coop_quantity_improved(
                 document_text, product_code
@@ -2844,7 +2927,7 @@ def split_combined_line_item(full_line_text, entity, document_text=None):
                 if prop.type_ == "line_item/unit_price":
                     unit_price = clean_price(prop.mention_text)
                 elif prop.type_ == "line_item/quantity" and not quantity:
-                    # Only use entity quantity if Creative-Coop extraction failed
+                    # Only use entity quantity if Creative Co-op extraction failed
                     qty_text = prop.mention_text.strip()
                     qty_match = re.search(r"\b(\d+(?:\.\d+)?)\b", qty_text)
                     if qty_match:
@@ -2892,7 +2975,7 @@ def detect_vendor_type(document_text):
         if indicator.lower() in document_text.lower():
             return "HarperCollins"
 
-    # Check for Creative-Coop indicators
+    # Check for Creative Co-op indicators
     creative_coop_indicators = [
         "Creative Co-op",
         "creativeco-op",
@@ -2902,14 +2985,14 @@ def detect_vendor_type(document_text):
 
     for indicator in creative_coop_indicators:
         if indicator.lower() in document_text.lower():
-            return "Creative-Coop"
+            return "Creative Co-op"
 
-    # Also check for Creative-Coop product code patterns (D-codes and XS-codes)
+    # Also check for Creative Co-op product code patterns (D-codes and XS-codes)
     creative_coop_product_codes = extract_creative_coop_product_codes(document_text)
     if (
         len(creative_coop_product_codes) >= 2
-    ):  # If we find 2+ Creative-Coop codes, likely a Creative-Coop invoice
-        return "Creative-Coop"
+    ):  # If we find 2+ Creative Co-op codes, likely a Creative Co-op invoice
+        return "Creative Co-op"
 
     # Check for OneHundred80 indicators
     onehundred80_indicators = [
@@ -3093,7 +3176,7 @@ def process_harpercollins_document(document):
     return rows
 
 
-# Creative-Coop Invoice Number Pattern Constants
+# Creative Co-op Invoice Number Pattern Constants
 CREATIVE_COOP_INVOICE_PATTERNS = [
     (
         "ORDER_NO_MULTILINE",
@@ -3132,7 +3215,7 @@ def extract_creative_coop_invoice_number(document_text, entities):
 
 
 def process_creative_coop_document(document):
-    """Process Creative-Coop documents with comprehensive wholesale prices and ordered quantities"""
+    """Process Creative Co-op documents with comprehensive wholesale prices and ordered quantities"""
 
     # Handle edge cases gracefully
     if not document or not hasattr(document, "text") or document.text is None:
@@ -3142,15 +3225,15 @@ def process_creative_coop_document(document):
     # Extract basic invoice info
     entities = {e.type_: e.mention_text for e in document.entities}
 
-    # For Creative-Coop, use consistent vendor name since we've already identified this as Creative-Coop
-    vendor = "Creative-Coop"
+    # For Creative Co-op, use consistent vendor name since we've already identified this as Creative Co-op
+    vendor = "Creative Co-op"
 
     # Extract invoice number using enhanced pattern matching
     invoice_number = extract_creative_coop_invoice_number(document.text, entities)
 
     invoice_date = format_date(entities.get("invoice_date", ""))
     if not invoice_date:
-        # Try alternative date extraction patterns for Creative-Coop
+        # Try alternative date extraction patterns for Creative Co-op
         date_patterns = [
             r"Date\s*:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
             r"Invoice\s+Date\s*:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
@@ -3163,7 +3246,7 @@ def process_creative_coop_document(document):
                 break
 
     print(
-        f"Creative-Coop processing: Vendor={vendor}, Invoice={invoice_number}, Date={invoice_date}"
+        f"Creative Co-op processing: Vendor={vendor}, Invoice={invoice_number}, Date={invoice_date}"
     )
 
     # Get corrected product mappings using algorithmic approach
@@ -3185,7 +3268,7 @@ def process_creative_coop_document(document):
             # Extract all numerical values from this entity
             numbers = re.findall(r"\b\d+(?:\.\d{1,2})?\b", entity_text)
 
-            # Look for Creative-Coop patterns for each product in this entity
+            # Look for Creative Co-op patterns for each product in this entity
             for product_code in product_codes:
                 if product_code not in all_product_data:
                     all_product_data[product_code] = {
@@ -3404,12 +3487,14 @@ def process_creative_coop_document(document):
         )
         print("This eliminates placeholder data generation and ensures data quality")
 
-    print(f"Creative-Coop processing completed: {len(rows)} items with ordered qty > 0")
+    print(
+        f"Creative Co-op processing completed: {len(rows)} items with ordered qty > 0"
+    )
     return rows
 
 
 def validate_creative_coop_data_quality(rows, all_product_codes):
-    """REFACTOR: Validate Creative-Coop processing data quality with comprehensive metrics"""
+    """REFACTOR: Validate Creative Co-op processing data quality with comprehensive metrics"""
     if not rows:
         return {"error": "No data to validate"}
 
@@ -3482,7 +3567,7 @@ def validate_creative_coop_data_quality(rows, all_product_codes):
 
 
 def print_quality_report(metrics):
-    """REFACTOR: Print comprehensive quality report for Creative-Coop processing"""
+    """REFACTOR: Print comprehensive quality report for Creative Co-op processing"""
     if "error" in metrics:
         print(f"⚠️ Quality validation error: {metrics['error']}")
         return
@@ -3539,7 +3624,7 @@ def print_quality_report(metrics):
 
 def extract_creative_coop_product_mappings_corrected(document_text):
     """
-    Extract correct Creative-Coop product mappings by fixing the offset issue
+    Extract correct Creative Co-op product mappings by fixing the offset issue
 
     The issue: Products are getting UPC/description from the PREVIOUS position
     The fix: Shift the mapping by +1 to get the correct UPC/description for each product
@@ -3571,7 +3656,7 @@ def extract_creative_coop_product_mappings_corrected(document_text):
     product_matches = list(re.finditer(product_pattern, table_section))
 
     print(
-        f"Creative-Coop mapping: Found {len(upc_matches)} UPCs, {len(product_matches)} products"
+        f"Creative Co-op mapping: Found {len(upc_matches)} UPCs, {len(product_matches)} products"
     )
 
     mappings = {}
@@ -3634,7 +3719,7 @@ def extract_creative_coop_product_mappings_corrected(document_text):
                 f"✓ {product_code}: UPC={target_upc}, Desc='{target_description[:50]}{'...' if len(target_description) > 50 else ''}'"
             )
 
-    print(f"Extracted {len(mappings)} Creative-Coop product mappings algorithmically")
+    print(f"Extracted {len(mappings)} Creative Co-op product mappings algorithmically")
     return mappings
 
 
@@ -3963,7 +4048,7 @@ def extract_oneHundred80_product_description(document_text, product_code, upc_co
 
 def validate_price_extraction(price, product_code, document_text):
     """
-    Validate extracted price meets Creative-Coop business logic standards.
+    Validate extracted price meets Creative Co-op business logic standards.
 
     Args:
         price (str): Extracted price (e.g., "$1.60")
@@ -4043,7 +4128,7 @@ def validate_price_extraction(price, product_code, document_text):
 
 def apply_business_price_logic(price, product_code, document_context=""):
     """
-    Apply Creative-Coop business logic corrections to extracted prices.
+    Apply Creative Co-op business logic corrections to extracted prices.
 
     Args:
         price (str): Original extracted price
@@ -4072,7 +4157,7 @@ def apply_business_price_logic(price, product_code, document_context=""):
 
 def validate_price_against_industry_standards(price, product_code, validation_rules):
     """
-    Validate price against Creative-Coop industry-specific standards.
+    Validate price against Creative Co-op industry-specific standards.
 
     Args:
         price (str): Price to validate (e.g., "$25.00")
@@ -4187,7 +4272,7 @@ def validate_product_line_pricing(price_value, product_code):
     if not product_code:
         return False
 
-    # Define product line price ranges based on Creative-Coop standards
+    # Define product line price ranges based on Creative Co-op standards
     if product_code.startswith("XS"):
         # XS products: ornaments, decorative items
         return 0.50 <= price_value <= 50.00
@@ -4400,7 +4485,7 @@ def extract_creative_coop_quantity_enhanced(document_text, product_code):
 
 
 def validate_quantity_business_logic(quantity, product_code):
-    """Validate quantity meets Creative-Coop business logic"""
+    """Validate quantity meets Creative Co-op business logic"""
 
     # Basic range validation
     if quantity < 0 or quantity > 1000:
@@ -4527,7 +4612,7 @@ def parse_multiline_quantity_patterns(context_lines):
                             numeric_values.append(0)
 
                     if len(numeric_values) >= 4:
-                        # Assume standard Creative-Coop order: Ord, Alloc, Shipped, BkOrd
+                        # Assume standard Creative Co-op order: Ord, Alloc, Shipped, BkOrd
                         quantities["ordered"] = numeric_values[0]
                         quantities["allocated"] = numeric_values[1]
                         quantities["shipped"] = numeric_values[2]
@@ -4571,7 +4656,7 @@ def parse_multiline_quantity_patterns(context_lines):
 
 def extract_quantity_from_multiline_enhanced(text, product_code, correlation_id=None):
     """
-    Enhanced multi-line quantity extraction for complex Creative-Coop formats.
+    Enhanced multi-line quantity extraction for complex Creative Co-op formats.
 
     Handles various multi-line layouts:
     - Standard vertical layout: Product/UPC/Description/Qty/Qty/Qty/Unit
@@ -4748,7 +4833,7 @@ def extract_quantity_from_multiline_enhanced(text, product_code, correlation_id=
 
 def validate_quantity_extraction(quantity, product_code, document_context):
     """
-    Validate extracted quantity meets Creative-Coop business logic standards.
+    Validate extracted quantity meets Creative Co-op business logic standards.
 
     Args:
         quantity: Extracted quantity (int or convertible)
@@ -4788,7 +4873,7 @@ def validate_quantity_extraction(quantity, product_code, document_context):
 
 def apply_quantity_business_logic(quantity, product_code):
     """
-    Apply business logic to transform quantities according to Creative-Coop rules.
+    Apply business logic to transform quantities according to Creative Co-op rules.
 
     Args:
         quantity (int): Input quantity
@@ -5033,7 +5118,7 @@ def extract_products_from_page(page, document_text, page_cache=None):
         page_text = pages_text[page_number - 1] if page_number > 1 else pages_text[0]
     else:
         # Fallback: estimate page boundaries by document length
-        total_pages = 15  # Known for Creative-Coop documents
+        total_pages = 15  # Known for Creative Co-op documents
         page_size = len(document_text) // total_pages
         start_pos = (page_number - 1) * page_size
         end_pos = page_number * page_size
@@ -5249,7 +5334,7 @@ def validate_entity_page_assignment(document):
 
 def process_large_creative_coop_document(document):
     """
-    Process large Creative-Coop documents with advanced memory optimization and performance monitoring.
+    Process large Creative Co-op documents with advanced memory optimization and performance monitoring.
 
     Args:
         document: Document AI document object with pages
@@ -5773,7 +5858,7 @@ def extract_product_code_from_entity(entity):
     if not entity_text:
         return None
 
-    # Look for Creative-Coop product code patterns
+    # Look for Creative Co-op product code patterns
     product_patterns = [
         r"\b([A-Z]{2}\d{4}[A-Z]?)\b",  # XS9826A format
         r"\b([A-Z]{2}\d{4})\b",  # XS9826 format
@@ -5843,7 +5928,7 @@ def validate_entity_page_boundaries(document):
 
 def extract_enhanced_product_description(document_text, product_code, upc_code=None):
     """
-    Extract complete product descriptions with UPC integration for Creative-Coop invoices.
+    Extract complete product descriptions with UPC integration for Creative Co-op invoices.
 
     Args:
         document_text (str): Full document text containing product information
@@ -6203,7 +6288,7 @@ def clean_table_headers(description):
 
     cleaned = description
 
-    # Common table headers in Creative-Coop invoices
+    # Common table headers in Creative Co-op invoices
     table_headers = [
         "Product Code",
         "UPC",
@@ -6633,13 +6718,13 @@ def generate_quality_metrics(product_descriptions):
 
 
 # ============================================================================
-# Phase 02 Integration Functions - Enhanced Creative-Coop Processing
+# Phase 02 Integration Functions - Enhanced Creative Co-op Processing
 # ============================================================================
 
 
 def process_creative_coop_document_phase_02_enhanced(document, timeout=120):
     """
-    Process Creative-Coop document with all Phase 02 enhancements integrated.
+    Process Creative Co-op document with all Phase 02 enhancements integrated.
 
     Meets Phase 02 success criteria:
     - Price extraction: 95%+ accuracy (eliminates $1.60 placeholders)
@@ -6658,7 +6743,7 @@ def process_creative_coop_document_phase_02_enhanced(document, timeout=120):
     if not document:
         return []
 
-    print("🚀 Processing Creative-Coop document with Phase 02 enhancements")
+    print("🚀 Processing Creative Co-op document with Phase 02 enhancements")
 
     # Phase 02.3: Memory-efficient multi-page processing
     if hasattr(document, "pages") and len(document.pages) > 5:
@@ -6670,7 +6755,7 @@ def process_creative_coop_document_phase_02_enhanced(document, timeout=120):
     enhanced_results = []
 
     for row in results:
-        # Handle Creative-Coop row format: [invoice_date, vendor, invoice_number, full_description, wholesale_price, ordered_qty]
+        # Handle Creative Co-op row format: [invoice_date, vendor, invoice_number, full_description, wholesale_price, ordered_qty]
         if not isinstance(row, list) or len(row) < 6:
             continue
 
@@ -6828,7 +6913,7 @@ def validate_quantity_extraction(quantity, product_code, document_text):
     return (
         isinstance(quantity, (int, float))
         and quantity > 0
-        and quantity != 24  # Known Creative-Coop placeholder
+        and quantity != 24  # Known Creative Co-op placeholder
         and quantity <= 1000
     )  # Reasonable range
 
@@ -6852,7 +6937,7 @@ def process_large_creative_coop_document(document):
     """Memory-efficient processing for large documents (15+ pages)"""
     print("💾 Using memory-efficient processing for large document")
 
-    # Use existing Creative-Coop processing with memory awareness
+    # Use existing Creative Co-op processing with memory awareness
     return process_creative_coop_document(document)
 
 

@@ -82,7 +82,7 @@ The system implements a **single Cloud Function** (`process_invoice` in `main.py
 3. **Multi-tier Extraction**:
    - **Tier 1**: Gemini AI (currently disabled due to timeout)
    - **Tier 2**: Document AI Entities extraction
-   - **Tier 3**: Document AI Tables processing  
+   - **Tier 3**: Document AI Tables processing
    - **Tier 4**: Regex-based text extraction
 4. **Data Output**: Writes to Google Sheets starting at column B
 
