@@ -134,7 +134,7 @@ class TestOptimizedProductCodeSearch(unittest.TestCase):
         self.test_text = (
             """
         DF6802 8 0 lo each $12.50
-        ST1234 6 2 Set $8.75  
+        ST1234 6 2 Set $8.75
         AB9876 12 0 pc $5.25
         XY5432 4 1 box $15.00
         """
@@ -221,7 +221,7 @@ class TestOptimizedProductCodeSearch(unittest.TestCase):
         complex_text = """
         Product DF6802: 8 0 lo each $12.50 wholesale amount
         Item ST1234: 6 2 Set $8.75 ordered back unit
-        Code AB9876: 12 0 pc $5.25 shipped 
+        Code AB9876: 12 0 pc $5.25 shipped
         UPC: 123456789012 XY5432: 4 1 box $15.00
         """
 

@@ -36,11 +36,11 @@ def test_extracts_wholesale_price_from_your_price_column():
     XS9826A      | 191009727774| 6"H Metal Ballerina... | 24      | 0         | 0           | 24        | each | 2.00       | 1.60       | 38.40
     XS8911A      | 191009710615| 4-3/4"L x 3-1/2"W...   | 12      | 0         | 0           | 0         | each | 10.00      | 8.00       | 0.00
     """
-    
+
     # Act
     price_xs9826a = extract_tabular_price_creative_coop_enhanced(tabular_text, "XS9826A")
     price_xs8911a = extract_tabular_price_creative_coop_enhanced(tabular_text, "XS8911A")
-    
+
     # Assert
     assert price_xs9826a == "$1.60"
     assert price_xs8911a == "$8.00"
@@ -48,15 +48,15 @@ def test_extracts_wholesale_price_from_your_price_column():
 def test_processes_cs003837319_test_products_accurately():
     # Load CS003837319_Error 2.PDF test data
     cs_document_text = load_test_document('CS003837319_Error_2_docai_output.json')
-    
+
     # Test specific known products from manual analysis
     test_products = {
         "XS9826A": "$1.60",
-        "XS9649A": "$2.80", 
+        "XS9649A": "$2.80",
         "XS9482": "$2.80",
         "XS8185": "$12.00"
     }
-    
+
     for product_code, expected_price in test_products.items():
         extracted_price = extract_tabular_price_creative_coop_enhanced(cs_document_text, product_code)
         assert extracted_price == expected_price
@@ -70,18 +70,18 @@ def test_handles_malformed_price_data_gracefully():
     XS9826A | 191009727774 | Product | 24 | 0 | 0 | 24 | each | 2.00 | N/A | 38.40
     XS8911A | 191009710615 | Product | 12 | 0 | 0 | 0  | each | 10.00 |     | 0.00
     """
-    
+
     # Should fallback to multi-tier extraction
     price1 = extract_tabular_price_creative_coop_enhanced(malformed_text, "XS9826A")
     price2 = extract_tabular_price_creative_coop_enhanced(malformed_text, "XS8911A")
-    
+
     # Should attempt fallback extraction, not return None
     assert price1 is not None or "fallback attempted"
     assert price2 is not None or "fallback attempted"
 
 def test_handles_missing_product_code_gracefully():
     text = "XS9826A | 191009727774 | Product | 24 | 0 | 0 | 24 | each | 2.00 | 1.60 | 38.40"
-    
+
     result = extract_tabular_price_creative_coop_enhanced(text, "XS9999A")
     # Should fallback to multi-tier extraction
     assert result is not None or "multi-tier fallback called"
@@ -94,7 +94,7 @@ def test_validates_price_business_logic():
     text_with_placeholder = """
     XS9826A | 191009727774 | Product | 24 | 0 | 0 | 24 | each | 2.00 | 1.60 | 38.40
     """
-    
+
     result = extract_tabular_price_creative_coop_enhanced(text_with_placeholder, "XS9826A")
     # Should detect and reject placeholder price
     assert result != "$1.60" or "placeholder price rejected"
@@ -105,7 +105,7 @@ def test_handles_various_currency_formats():
         "XS9826A | Product | Data | Data | Data | Data | Data | 2.00 | 1.60 | 38.40",
         "XS9826A | Product | Data | Data | Data | Data | Data | USD2.00 | USD1.60 | USD38.40"
     ]
-    
+
     for text in text_formats:
         result = extract_tabular_price_creative_coop_enhanced(text, "XS9826A")
         assert result == "$1.60"
@@ -118,28 +118,28 @@ def test_handles_various_currency_formats():
 def extract_tabular_price_creative_coop_enhanced(document_text, product_code):
     """
     Extract wholesale prices from Creative Coop tabular format with enhanced accuracy.
-    
-    Table Structure: Product Code | UPC | RT | Qty Ord | Qty Alloc | Qty Shipped | 
+
+    Table Structure: Product Code | UPC | RT | Qty Ord | Qty Alloc | Qty Shipped |
                      Qty BkOrd | U/M | List Price | Your Price | Your Extd Price
-    
+
     Args:
         document_text (str): Full document text containing tabular data
         product_code (str): Product code to find price for (e.g., "XS9826A")
-    
+
     Returns:
         str: Formatted price (e.g., "$1.60") or fallback to multi-tier extraction
-        
+
     Raises:
         ValueError: If input parameters are invalid
     """
     import re
-    
+
     if not document_text or not product_code:
         return extract_multi_tier_price_creative_coop_enhanced(document_text, product_code)
-    
+
     # Search for product code in tabular context
     product_pattern = rf"{re.escape(product_code)}\s+"
-    
+
     for line in document_text.split('\n'):
         if re.search(product_pattern, line, re.IGNORECASE):
             # Look for tabular row containing the product
@@ -147,12 +147,12 @@ def extract_tabular_price_creative_coop_enhanced(document_text, product_code):
             if len(price_matches) >= 2:
                 # Extract "Your Price" column (wholesale price)
                 wholesale_price = price_matches[-2]  # Your Price column
-                
+
                 # Validate price is not placeholder
                 if wholesale_price != "1.60":
                     print(f"✅ Extracted wholesale price for {product_code}: ${wholesale_price}")
                     return f"${wholesale_price}"
-    
+
     # Fallback to multi-tier extraction
     return extract_multi_tier_price_creative_coop_enhanced(document_text, product_code)
 ```
@@ -189,7 +189,7 @@ def extract_tabular_price_creative_coop_enhanced(document_text, product_code):
 ## Engineering Principles Compliance
 
 **Principle 7. Multi-pattern resilience**: Handles various tabular formats and layouts
-**Principle 8. Context-aware extraction**: Uses column position and header context for accurate extraction  
+**Principle 8. Context-aware extraction**: Uses column position and header context for accurate extraction
 **Principle 9. Algorithmic processing**: Uses pattern matching, not hardcoded price values
 
 ## Monitoring & Observability
@@ -248,6 +248,6 @@ logger.warning("Tabular price extraction fallback", extra={
 **Test Coverage**:
 - [ ] Unit tests for tabular pattern recognition
 - [ ] Integration tests with CS003837319_Error 2.PDF
-- [ ] Price validation and placeholder rejection testing  
+- [ ] Price validation and placeholder rejection testing
 - [ ] Performance testing with large tabular documents
 - [ ] Fallback integration testing

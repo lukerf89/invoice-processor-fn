@@ -33,18 +33,18 @@ def test_current_processing_limited_to_43_products():
     # Load CS003837319_Error Document AI output
     with open('test_invoices/CS003837319_Error_docai_output.json', 'r') as f:
         doc_data = json.load(f)
-    
+
     # Create mock document
     mock_document = Mock()
     mock_document.text = doc_data.get('text', '')
     mock_document.entities = []
-    
+
     # Process with current implementation
     results = process_creative_coop_document(mock_document)
-    
+
     # RED: Should demonstrate current limitation
     unique_products = len(set(row[2] for row in results if len(row) > 2 and row[2]))
-    
+
     # Current implementation should return exactly 43 unique products
     assert unique_products <= 43, f"Current implementation should process ≤43 products, got: {unique_products}"
     print(f"Current processing extracts {unique_products} unique products")
@@ -59,18 +59,18 @@ def test_placeholder_data_generation_occurs():
             rows = list(reader)
     except FileNotFoundError:
         pytest.skip("Production output file not available")
-    
+
     # Count rows with placeholder data
     placeholder_rows = []
     for row in rows[1:]:  # Skip header
         if len(row) >= 6:  # Ensure we have price and quantity columns
             price = row[4] if len(row) > 4 else ""
             quantity = row[5] if len(row) > 5 else ""
-            
+
             # Check for placeholder patterns
             if price == "$1.60" and quantity == "24":
                 placeholder_rows.append(row)
-    
+
     # RED: Should find placeholder entries in current output
     assert len(placeholder_rows) > 0, f"Expected placeholder entries, found: {len(placeholder_rows)}"
     print(f"Found {len(placeholder_rows)} placeholder '$1.60, 24' entries")
@@ -80,17 +80,17 @@ def test_traditional_d_code_format_entries_exist():
     # Process current CS003837319_Error
     with open('test_invoices/CS003837319_Error_docai_output.json', 'r') as f:
         doc_data = json.load(f)
-    
+
     mock_document = Mock()
     mock_document.text = doc_data.get('text', '')
     mock_document.entities = []
-    
+
     results = process_creative_coop_document(mock_document)
-    
+
     # Count entries with "Traditional D-code format" in description
-    traditional_entries = [row for row in results if len(row) > 3 and 
+    traditional_entries = [row for row in results if len(row) > 3 and
                           "Traditional D-code format" in str(row[3])]
-    
+
     # RED: Should find these placeholder descriptions
     assert len(traditional_entries) > 0, f"Expected 'Traditional D-code format' entries, found: {len(traditional_entries)}"
 
@@ -98,28 +98,28 @@ def test_product_code_extraction_finds_all_codes():
     """Test that product code extraction finds all 130+ codes in document"""
     with open('test_invoices/CS003837319_Error_docai_output.json', 'r') as f:
         doc_data = json.load(f)
-    
+
     document_text = doc_data.get('text', '')
-    
+
     # Extract all Creative-Coop product codes using current patterns
     import re
-    
+
     # All known Creative-Coop patterns
     patterns = [
         r"\b(XS\d+[A-Z]?)\b",     # XS codes
-        r"\b(CF\d+[A-Z]?)\b",     # CF codes  
+        r"\b(CF\d+[A-Z]?)\b",     # CF codes
         r"\b(CD\d+[A-Z]?)\b",     # CD codes
         r"\b(HX\d+[A-Z]?)\b",     # HX codes
         r"\b(XT\d+[A-Z]?)\b",     # XT codes
     ]
-    
+
     all_codes = set()
     for pattern in patterns:
         codes = re.findall(pattern, document_text)
         all_codes.update(codes)
-    
+
     print(f"Document contains {len(all_codes)} unique product codes")
-    
+
     # RED: Should find 130+ codes but current processing doesn't handle them all
     assert len(all_codes) >= 130, f"Expected 130+ product codes, found: {len(all_codes)}"
 
@@ -127,17 +127,17 @@ def test_algorithmic_vs_hardcoded_approach():
     """Test current approach uses algorithmic extraction (no hardcoded values)"""
     # This is more of a code review test - examine current mappings function
     import inspect
-    
+
     source = inspect.getsource(extract_creative_coop_product_mappings_corrected)
-    
+
     # Should not contain hardcoded product-specific values
     hardcoded_indicators = ["XS9826A", "CS003837319", "1.60", "24"]
-    
+
     found_hardcoded = []
     for indicator in hardcoded_indicators:
         if indicator in source:
             found_hardcoded.append(indicator)
-    
+
     # Should pass - current implementation should be algorithmic
     assert len(found_hardcoded) == 0, f"Found hardcoded values: {found_hardcoded}"
 ```
@@ -149,44 +149,44 @@ Enhance the `extract_creative_coop_product_mappings_corrected()` function to pro
 ```python
 def extract_creative_coop_product_mappings_enhanced(document_text):
     """Enhanced product mapping with expanded scope for all 130+ products"""
-    
+
     # Increase search scope significantly (was limited previously)
     # Use full document text instead of limiting search range
     full_line_text = document_text
-    
+
     print(f"Processing Creative-Coop document with {len(full_line_text)} characters")
-    
+
     # Extract all product codes using comprehensive patterns
     product_code_patterns = [
         r"\b(XS\d+[A-Z]?)\b",     # XS codes (primary Creative-Coop format)
         r"\b(CF\d+[A-Z]?)\b",     # CF codes
-        r"\b(CD\d+[A-Z]?)\b",     # CD codes  
+        r"\b(CD\d+[A-Z]?)\b",     # CD codes
         r"\b(HX\d+[A-Z]?)\b",     # HX codes
         r"\b(XT\d+[A-Z]?)\b",     # XT codes
         r"\b(D[A-Z]\d{4}[A-Z]?)\b"  # Legacy D codes (maintain compatibility)
     ]
-    
+
     all_product_codes = set()
     for pattern in product_code_patterns:
         codes = re.findall(pattern, full_line_text)
         all_product_codes.update(codes)
-    
+
     print(f"Found {len(all_product_codes)} unique product codes for processing")
-    
+
     # Process each product code algorithmically
     mappings = {}
-    
+
     for product_code in all_product_codes:
         print(f"Processing product code: {product_code}")
-        
+
         # Extract UPC for this product (algorithmic approach)
         upc_pattern = rf"{re.escape(product_code)}\s+(\d{{12}})"
         upc_match = re.search(upc_pattern, full_line_text)
         upc = upc_match.group(1) if upc_match else ""
-        
+
         # Extract description using contextual search
         description = extract_product_description_contextual(full_line_text, product_code, upc)
-        
+
         # Only include products that have real data (not placeholders)
         if upc and description and "Traditional D-code format" not in description:
             mappings[product_code] = {
@@ -196,13 +196,13 @@ def extract_creative_coop_product_mappings_enhanced(document_text):
             print(f"✓ Successfully mapped {product_code}: UPC={upc}")
         else:
             print(f"⚠️ Insufficient data for {product_code}, skipping to avoid placeholder")
-    
+
     print(f"Successfully processed {len(mappings)} products with complete data")
     return mappings
 
 def extract_product_description_contextual(document_text, product_code, upc):
     """Extract product description using contextual clues around product code and UPC"""
-    
+
     # Strategy 1: Look for description between product code and UPC
     if upc:
         pattern1 = rf"{re.escape(product_code)}\s+([^0-9]+?)\s+{re.escape(upc)}"
@@ -211,7 +211,7 @@ def extract_product_description_contextual(document_text, product_code, upc):
             desc = match1.group(1).strip()
             if len(desc) > 5 and not re.match(r'^\d+$', desc):  # Valid description
                 return desc
-    
+
     # Strategy 2: Look for description after product code
     pattern2 = rf"{re.escape(product_code)}\s+([A-Za-z][^0-9]{{5,50}})"
     match2 = re.search(pattern2, document_text)
@@ -221,7 +221,7 @@ def extract_product_description_contextual(document_text, product_code, upc):
         desc = re.sub(r'\s+', ' ', desc)  # Normalize whitespace
         if len(desc) > 5:
             return desc
-    
+
     # Strategy 3: Use expanded search around product code
     # Find position of product code and search nearby text
     code_pos = document_text.find(product_code)
@@ -230,13 +230,13 @@ def extract_product_description_contextual(document_text, product_code, upc):
         start = max(0, code_pos - 100)
         end = min(len(document_text), code_pos + 100)
         context = document_text[start:end]
-        
+
         # Extract meaningful description text
         desc_patterns = [
             r"[A-Z][a-z]+(?:\s+[A-Za-z]+){1,5}",  # Multi-word descriptions
             r"[A-Z][a-z]{3,}",  # Single meaningful words
         ]
-        
+
         for pattern in desc_patterns:
             matches = re.findall(pattern, context)
             if matches:
@@ -244,7 +244,7 @@ def extract_product_description_contextual(document_text, product_code, upc):
                 best_desc = max(matches, key=len)
                 if len(best_desc) > 5:
                     return best_desc
-    
+
     return ""  # No description found - avoid placeholder
 
 # Remove placeholder data generation logic
@@ -264,7 +264,7 @@ Optimize for performance and create comprehensive product data validation:
 # Add constants for product processing
 CREATIVE_COOP_PRODUCT_PATTERNS = {
     "XS_CODES": r"\b(XS\d+[A-Z]?)\b",
-    "CF_CODES": r"\b(CF\d+[A-Z]?)\b", 
+    "CF_CODES": r"\b(CF\d+[A-Z]?)\b",
     "CD_CODES": r"\b(CD\d+[A-Z]?)\b",
     "HX_CODES": r"\b(HX\d+[A-Z]?)\b",
     "XT_CODES": r"\b(XT\d+[A-Z]?)\b",
@@ -274,12 +274,12 @@ CREATIVE_COOP_PRODUCT_PATTERNS = {
 def extract_all_creative_coop_product_codes(document_text):
     """Extract all Creative-Coop product codes using optimized patterns"""
     all_codes = set()
-    
+
     for pattern_name, pattern in CREATIVE_COOP_PRODUCT_PATTERNS.items():
         codes = re.findall(pattern, document_text)
         all_codes.update(codes)
         print(f"Pattern {pattern_name}: found {len(codes)} codes")
-    
+
     return sorted(list(all_codes))  # Return sorted for consistent processing
 
 def validate_product_data_quality(mappings):
@@ -291,48 +291,48 @@ def validate_product_data_quality(mappings):
         "unique_upcs": set(),
         "unique_descriptions": set()
     }
-    
+
     for product_code, data in mappings.items():
         if data.get("upc"):
             quality_metrics["products_with_upc"] += 1
             quality_metrics["unique_upcs"].add(data["upc"])
-        
+
         if data.get("description"):
             quality_metrics["products_with_description"] += 1
             quality_metrics["unique_descriptions"].add(data["description"])
-    
+
     # Quality validation
     upc_completeness = quality_metrics["products_with_upc"] / len(mappings) if mappings else 0
     desc_completeness = quality_metrics["products_with_description"] / len(mappings) if mappings else 0
-    
+
     print(f"Product Quality Metrics:")
     print(f"  Total Products: {quality_metrics['total_products']}")
     print(f"  UPC Completeness: {upc_completeness:.1%}")
     print(f"  Description Completeness: {desc_completeness:.1%}")
     print(f"  Unique UPCs: {len(quality_metrics['unique_upcs'])}")
     print(f"  Unique Descriptions: {len(quality_metrics['unique_descriptions'])}")
-    
+
     return quality_metrics
 
 def extract_creative_coop_product_mappings_optimized(document_text):
     """Optimized product mapping with comprehensive scope and quality validation"""
-    
+
     # Step 1: Extract all product codes
     all_product_codes = extract_all_creative_coop_product_codes(document_text)
     print(f"Processing {len(all_product_codes)} product codes")
-    
+
     # Step 2: Build mappings algorithmically
     mappings = {}
     processed_count = 0
     skipped_count = 0
-    
+
     for product_code in all_product_codes:
         # Extract UPC
         upc = extract_upc_for_product(document_text, product_code)
-        
+
         # Extract description
         description = extract_product_description_contextual(document_text, product_code, upc)
-        
+
         # Quality gate - only include complete data
         if upc and description and len(description) > 5:
             mappings[product_code] = {
@@ -343,12 +343,12 @@ def extract_creative_coop_product_mappings_optimized(document_text):
         else:
             skipped_count += 1
             print(f"⚠️ Skipped {product_code}: UPC={bool(upc)}, Desc={bool(description)}")
-    
+
     print(f"✓ Processed: {processed_count}, Skipped: {skipped_count}")
-    
+
     # Step 3: Validate quality
     quality_metrics = validate_product_data_quality(mappings)
-    
+
     return mappings
 ```
 
@@ -449,7 +449,7 @@ def extract_creative_coop_product_mappings_optimized(document_text):
 - **Improved mapping**: From 47 UPCs to 138 UPCs discovered
 - **Results**: 119 products with complete data (0 placeholder entries)
 
-#### REFACTOR Phase ✅ COMPLETED  
+#### REFACTOR Phase ✅ COMPLETED
 - **Added quality validation**: `validate_creative_coop_data_quality()` function
 - **Implemented reporting**: `print_quality_report()` with comprehensive metrics
 - **Enhanced logging**: Detailed processing summary with success/skip tracking
@@ -462,7 +462,7 @@ def extract_creative_coop_product_mappings_optimized(document_text):
 1. ✅ **Product Count**: 119 products (target: 100+) - **19% OVER TARGET**
 2. ✅ **No Placeholder Data**: 0 entries (target: 0) - **PERFECT ELIMINATION**
 3. ✅ **Price Diversity**: 32 unique prices (target: 15+) - **113% OVER TARGET**
-4. ✅ **Quantity Diversity**: 13 unique quantities (target: 8+) - **62% OVER TARGET**  
+4. ✅ **Quantity Diversity**: 13 unique quantities (target: 8+) - **62% OVER TARGET**
 5. ✅ **Data Completeness**: 100% complete records (target: 95%+) - **PERFECT QUALITY**
 6. ✅ **Product Variety**: 6 prefixes (target: 4+) - **50% OVER TARGET**
 
@@ -520,7 +520,7 @@ The implementation is **READY FOR IMMEDIATE DEPLOYMENT**:
 
 - ✅ All tests pass with flying colors
 - ✅ Performance within acceptable limits
-- ✅ No regressions in existing functionality  
+- ✅ No regressions in existing functionality
 - ✅ Comprehensive error handling
 - ✅ Quality monitoring and reporting
 - ✅ Zero placeholder data generation

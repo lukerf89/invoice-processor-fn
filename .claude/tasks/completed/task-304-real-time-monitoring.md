@@ -67,23 +67,23 @@ def test_accuracy_score_calculation():
         'valid_quantities_count': 130,
         'placeholder_data_detected': False
     }
-    
+
     accuracy_score = accuracy_tracker.calculate_accuracy_score(test_results)
-    
+
     assert 0.0 <= accuracy_score <= 1.0, "Accuracy score must be between 0 and 1"
     assert accuracy_score >= 0.90, "Should achieve high accuracy for test case"
 
 def test_performance_metrics_tracking():
     # Test performance metrics tracking and calculation
     performance_tracker = PerformanceMetricsTracker()
-    
+
     # Record multiple processing times
     processing_times = [42.1, 38.5, 51.2, 44.8, 39.9]
     for time_value in processing_times:
         performance_tracker.record_processing_time(time_value)
-    
+
     performance_stats = performance_tracker.get_performance_statistics()
-    
+
     assert performance_stats['average_processing_time'] < 60, "Average should be under target"
     assert performance_stats['sample_count'] == 5
     assert 'percentile_95' in performance_stats
@@ -97,17 +97,17 @@ def test_accuracy_threshold_monitoring():
     accuracy_monitor = AccuracyThresholdMonitor()
     accuracy_monitor.set_threshold('warning', 0.85)
     accuracy_monitor.set_threshold('critical', 0.80)
-    
+
     # Test warning threshold
     warning_result = accuracy_monitor.check_accuracy_threshold(0.82)
     assert warning_result['threshold_status'] == 'warning'
     assert warning_result['should_alert'] == True
-    
+
     # Test critical threshold
     critical_result = accuracy_monitor.check_accuracy_threshold(0.75)
     assert critical_result['threshold_status'] == 'critical'
     assert critical_result['should_alert'] == True
-    
+
     # Test normal operation
     normal_result = accuracy_monitor.check_accuracy_threshold(0.92)
     assert normal_result['threshold_status'] == 'normal'
@@ -116,7 +116,7 @@ def test_accuracy_threshold_monitoring():
 def test_creative_coop_specific_accuracy_tracking():
     # Test Creative-Coop specific accuracy metrics
     creative_coop_tracker = CreativeCoopAccuracyTracker()
-    
+
     test_invoice_result = {
         'invoice_number': 'CS003837319',
         'expected_products': 135,
@@ -126,9 +126,9 @@ def test_creative_coop_specific_accuracy_tracking():
         'correct_descriptions': 125,
         'placeholder_data_count': 0
     }
-    
+
     accuracy_metrics = creative_coop_tracker.calculate_detailed_accuracy(test_invoice_result)
-    
+
     assert 'product_extraction_rate' in accuracy_metrics
     assert 'price_accuracy_rate' in accuracy_metrics
     assert 'quantity_accuracy_rate' in accuracy_metrics
@@ -138,7 +138,7 @@ def test_creative_coop_specific_accuracy_tracking():
 def test_accuracy_trend_analysis():
     # Test accuracy trend analysis over time
     trend_analyzer = AccuracyTrendAnalyzer()
-    
+
     # Simulate accuracy data over time
     accuracy_data = [
         {'timestamp': '2024-01-01T10:00:00', 'accuracy': 0.92},
@@ -147,12 +147,12 @@ def test_accuracy_trend_analysis():
         {'timestamp': '2024-01-01T13:00:00', 'accuracy': 0.87},
         {'timestamp': '2024-01-01T14:00:00', 'accuracy': 0.91}
     ]
-    
+
     for data_point in accuracy_data:
         trend_analyzer.add_accuracy_data_point(data_point)
-    
+
     trend_analysis = trend_analyzer.analyze_accuracy_trends()
-    
+
     assert 'average_accuracy' in trend_analysis
     assert 'trend_direction' in trend_analysis  # 'improving', 'declining', 'stable'
     assert 'volatility_score' in trend_analysis
@@ -166,12 +166,12 @@ def test_performance_threshold_monitoring():
     performance_monitor.set_threshold('target', 60.0)  # 60 seconds target
     performance_monitor.set_threshold('warning', 90.0)  # 90 seconds warning
     performance_monitor.set_threshold('critical', 120.0)  # 120 seconds critical
-    
+
     # Test normal performance
     normal_result = performance_monitor.check_performance_threshold(45.2)
     assert normal_result['threshold_status'] == 'normal'
     assert normal_result['should_alert'] == False
-    
+
     # Test warning threshold
     warning_result = performance_monitor.check_performance_threshold(95.5)
     assert warning_result['threshold_status'] == 'warning'
@@ -180,17 +180,17 @@ def test_performance_threshold_monitoring():
 def test_memory_usage_monitoring():
     # Test memory usage monitoring
     memory_monitor = MemoryUsageMonitor()
-    
+
     test_memory_data = {
         'peak_memory_mb': 750,
         'average_memory_mb': 520,
         'memory_efficiency_score': 0.85,
         'garbage_collection_count': 3
     }
-    
+
     memory_monitor.record_memory_usage(test_memory_data)
     memory_stats = memory_monitor.get_memory_statistics()
-    
+
     assert memory_stats['peak_memory_mb'] == 750
     assert memory_stats['memory_within_limits'] == True  # Under 1GB
     assert memory_stats['efficiency_score'] == 0.85
@@ -198,17 +198,17 @@ def test_memory_usage_monitoring():
 def test_concurrent_processing_metrics():
     # Test concurrent processing performance metrics
     concurrent_monitor = ConcurrentProcessingMonitor()
-    
+
     test_concurrent_data = {
         'sequential_time': 120.5,
         'concurrent_time': 85.2,
         'worker_count': 3,
         'speedup_factor': 120.5 / 85.2
     }
-    
+
     concurrent_monitor.record_concurrent_processing_metrics(test_concurrent_data)
     concurrent_stats = concurrent_monitor.get_concurrent_statistics()
-    
+
     assert concurrent_stats['speedup_factor'] > 1.0
     assert concurrent_stats['efficiency_improvement'] > 0.20  # At least 20% improvement
 ```
@@ -218,7 +218,7 @@ def test_concurrent_processing_metrics():
 def test_business_kpi_calculation():
     # Test business KPI calculation and tracking
     business_kpi_tracker = BusinessKPITracker()
-    
+
     daily_processing_data = {
         'total_invoices_processed': 45,
         'successful_processing_count': 43,
@@ -227,9 +227,9 @@ def test_business_kpi_calculation():
         'manual_review_required': 3,
         'processing_errors': 2
     }
-    
+
     kpis = business_kpi_tracker.calculate_daily_kpis(daily_processing_data)
-    
+
     assert 'overall_success_rate' in kpis
     assert 'creative_coop_success_rate' in kpis
     assert 'manual_review_rate' in kpis
@@ -239,16 +239,16 @@ def test_business_kpi_calculation():
 def test_order_tracking_success_metrics():
     # Test order tracking success metrics
     order_tracking_monitor = OrderTrackingSuccessMonitor()
-    
+
     tracking_data = {
         'invoices_with_correct_numbers': 42,
         'total_invoices_processed': 45,
         'tracking_lookup_successes': 40,
         'tracking_lookup_attempts': 42
     }
-    
+
     tracking_metrics = order_tracking_monitor.calculate_tracking_metrics(tracking_data)
-    
+
     assert tracking_metrics['invoice_number_accuracy'] >= 0.90
     assert tracking_metrics['tracking_success_rate'] >= 0.85
     assert 'tracking_effectiveness_score' in tracking_metrics
@@ -256,15 +256,15 @@ def test_order_tracking_success_metrics():
 def test_manual_review_reduction_tracking():
     # Test manual review reduction metrics
     review_tracker = ManualReviewReductionTracker()
-    
+
     # Historical baseline
     baseline_data = {'manual_review_rate': 0.70}  # 70% manual review before
-    
+
     # Current performance
     current_data = {'manual_review_rate': 0.15}   # 15% manual review now
-    
+
     reduction_metrics = review_tracker.calculate_review_reduction(baseline_data, current_data)
-    
+
     assert reduction_metrics['review_reduction_percentage'] >= 0.50  # At least 50% reduction
     assert reduction_metrics['automation_effectiveness'] >= 0.80
 ```
@@ -275,30 +275,30 @@ def test_manual_review_reduction_tracking():
 ```python
 class RealTimeMonitoringSystem:
     """Main real-time monitoring system for Creative-Coop processing."""
-    
+
     def __init__(self):
         self.accuracy_tracker = AccuracyMetricsTracker()
         self.performance_tracker = PerformanceMetricsTracker()
         self.business_kpi_tracker = BusinessKPITracker()
         self.metrics_storage = MetricsStorage()
-    
+
     def record_processing_metrics(self, processing_result):
         """
         Record comprehensive processing metrics in real-time.
-        
+
         Args:
             processing_result (dict): Complete processing result with metrics
-            
+
         Returns:
             dict: Recorded metrics summary
-            
+
         Raises:
             MonitoringError: If metrics recording fails
         """
         try:
             timestamp = time.time()
             metrics_recorded = {}
-            
+
             # Record accuracy metrics
             if 'accuracy_score' in processing_result:
                 accuracy_metrics = self.accuracy_tracker.record_accuracy(
@@ -307,7 +307,7 @@ class RealTimeMonitoringSystem:
                     timestamp
                 )
                 metrics_recorded.update(accuracy_metrics)
-            
+
             # Record performance metrics
             if 'processing_time' in processing_result:
                 performance_metrics = self.performance_tracker.record_processing_time(
@@ -316,30 +316,30 @@ class RealTimeMonitoringSystem:
                     timestamp
                 )
                 metrics_recorded.update(performance_metrics)
-            
+
             # Record business KPI data
             business_metrics = self.business_kpi_tracker.record_processing_event(
                 processing_result, timestamp
             )
             metrics_recorded.update(business_metrics)
-            
+
             # Store all metrics
             self.metrics_storage.store_metrics({
                 'timestamp': timestamp,
                 'processing_result': processing_result,
                 'calculated_metrics': metrics_recorded
             })
-            
+
             return {
                 'metrics_count': len(metrics_recorded),
                 'timestamp': timestamp,
                 'recording_successful': True,
                 **metrics_recorded
             }
-            
+
         except Exception as e:
             raise MonitoringError(f"Failed to record processing metrics: {str(e)}")
-    
+
     def get_real_time_dashboard_data(self):
         """Get current dashboard data for real-time monitoring."""
         try:
@@ -350,19 +350,19 @@ class RealTimeMonitoringSystem:
                 'system_health': self._calculate_system_health(),
                 'last_updated': time.time()
             }
-            
+
             return dashboard_data
-            
+
         except Exception as e:
             raise MonitoringError(f"Failed to get dashboard data: {str(e)}")
 
 class AccuracyMetricsTracker:
     """Tracks and analyzes processing accuracy metrics."""
-    
+
     def __init__(self):
         self.accuracy_data = []
         self.threshold_monitor = AccuracyThresholdMonitor()
-    
+
     def record_accuracy(self, accuracy_score, vendor_type, timestamp):
         """Record accuracy score with context."""
         accuracy_entry = {
@@ -370,19 +370,19 @@ class AccuracyMetricsTracker:
             'vendor_type': vendor_type,
             'timestamp': timestamp
         }
-        
+
         self.accuracy_data.append(accuracy_entry)
-        
+
         # Check thresholds
         threshold_result = self.threshold_monitor.check_accuracy_threshold(accuracy_score)
-        
+
         return {
             'accuracy_score': accuracy_score,
             'threshold_status': threshold_result['threshold_status'],
             'should_alert': threshold_result['should_alert'],
             'vendor_type': vendor_type
         }
-    
+
     def calculate_accuracy_score(self, processing_results):
         """Calculate comprehensive accuracy score."""
         try:
@@ -393,7 +393,7 @@ class AccuracyMetricsTracker:
                 'quantity_accuracy': self._calculate_quantity_accuracy(processing_results),
                 'description_quality': self._calculate_description_quality(processing_results)
             }
-            
+
             # Weighted average of accuracy components
             weights = {
                 'line_item_extraction': 0.30,
@@ -402,25 +402,25 @@ class AccuracyMetricsTracker:
                 'quantity_accuracy': 0.20,
                 'description_quality': 0.10
             }
-            
+
             overall_accuracy = sum(
                 accuracy_components[component] * weights[component]
                 for component in accuracy_components
             )
-            
+
             return max(0.0, min(1.0, overall_accuracy))
-            
+
         except Exception as e:
             print(f"Accuracy calculation failed: {e}")
             return 0.0
-    
+
     def get_current_metrics(self):
         """Get current accuracy metrics summary."""
         if not self.accuracy_data:
             return {'status': 'no_data', 'metrics': {}}
-        
+
         recent_data = self.accuracy_data[-10:]  # Last 10 entries
-        
+
         current_metrics = {
             'current_accuracy': recent_data[-1]['accuracy_score'],
             'average_accuracy': sum(entry['accuracy_score'] for entry in recent_data) / len(recent_data),
@@ -428,16 +428,16 @@ class AccuracyMetricsTracker:
             'sample_count': len(recent_data),
             'last_updated': recent_data[-1]['timestamp']
         }
-        
+
         return current_metrics
 
 class PerformanceMetricsTracker:
     """Tracks and analyzes processing performance metrics."""
-    
+
     def __init__(self):
         self.performance_data = []
         self.threshold_monitor = PerformanceThresholdMonitor()
-    
+
     def record_processing_time(self, processing_time, document_size, timestamp):
         """Record processing time with context."""
         performance_entry = {
@@ -445,26 +445,26 @@ class PerformanceMetricsTracker:
             'document_size': document_size,
             'timestamp': timestamp
         }
-        
+
         self.performance_data.append(performance_entry)
-        
+
         # Check performance thresholds
         threshold_result = self.threshold_monitor.check_performance_threshold(processing_time)
-        
+
         return {
             'processing_time': processing_time,
             'threshold_status': threshold_result['threshold_status'],
             'should_alert': threshold_result['should_alert'],
             'performance_rating': self._rate_performance(processing_time)
         }
-    
+
     def get_performance_statistics(self):
         """Calculate comprehensive performance statistics."""
         if not self.performance_data:
             return {'status': 'no_data'}
-        
+
         processing_times = [entry['processing_time'] for entry in self.performance_data]
-        
+
         return {
             'average_processing_time': sum(processing_times) / len(processing_times),
             'median_processing_time': self._calculate_median(processing_times),
@@ -474,7 +474,7 @@ class PerformanceMetricsTracker:
             'sample_count': len(processing_times),
             'performance_trend': self._calculate_performance_trend()
         }
-    
+
     def _rate_performance(self, processing_time):
         """Rate performance based on processing time."""
         if processing_time <= 30:
@@ -488,11 +488,11 @@ class PerformanceMetricsTracker:
 
 class BusinessKPITracker:
     """Tracks business KPIs and operational metrics."""
-    
+
     def __init__(self):
         self.processing_events = []
         self.daily_summaries = {}
-    
+
     def record_processing_event(self, processing_result, timestamp):
         """Record a processing event for KPI calculation."""
         event = {
@@ -503,9 +503,9 @@ class BusinessKPITracker:
             'manual_review_required': processing_result.get('accuracy_score', 1.0) < 0.85,
             'invoice_number_correct': processing_result.get('invoice_number') is not None
         }
-        
+
         self.processing_events.append(event)
-        
+
         # Update daily summary
         date_key = time.strftime('%Y-%m-%d', time.localtime(timestamp))
         if date_key not in self.daily_summaries:
@@ -517,55 +517,55 @@ class BusinessKPITracker:
                 'manual_review_required': 0,
                 'correct_invoice_numbers': 0
             }
-        
+
         summary = self.daily_summaries[date_key]
         summary['total_invoices'] += 1
-        
+
         if event['processing_successful']:
             summary['successful_processing'] += 1
-        
+
         if event['vendor_type'] == 'Creative-Coop':
             summary['creative_coop_invoices'] += 1
             if event['processing_successful']:
                 summary['creative_coop_successful'] += 1
-        
+
         if event['manual_review_required']:
             summary['manual_review_required'] += 1
-        
+
         if event['invoice_number_correct']:
             summary['correct_invoice_numbers'] += 1
-        
+
         return {
             'event_recorded': True,
             'daily_summary_updated': True,
             'current_success_rate': self._calculate_current_success_rate()
         }
-    
+
     def calculate_daily_kpis(self, daily_data):
         """Calculate comprehensive daily KPIs."""
         if daily_data['total_invoices_processed'] == 0:
             return {'status': 'no_data'}
-        
+
         kpis = {
             'overall_success_rate': daily_data['successful_processing_count'] / daily_data['total_invoices_processed'],
             'creative_coop_success_rate': (
-                daily_data['creative_coop_successful'] / daily_data['creative_coop_invoices'] 
+                daily_data['creative_coop_successful'] / daily_data['creative_coop_invoices']
                 if daily_data['creative_coop_invoices'] > 0 else 0.0
             ),
             'manual_review_rate': daily_data['manual_review_required'] / daily_data['total_invoices_processed'],
             'error_rate': daily_data['processing_errors'] / daily_data['total_invoices_processed'],
             'automation_effectiveness': 1.0 - (daily_data['manual_review_required'] / daily_data['total_invoices_processed'])
         }
-        
+
         return kpis
-    
+
     def get_current_kpis(self):
         """Get current business KPI summary."""
         if not self.processing_events:
             return {'status': 'no_data'}
-        
+
         recent_events = self.processing_events[-50:]  # Last 50 events
-        
+
         current_kpis = {
             'recent_success_rate': sum(1 for e in recent_events if e['processing_successful']) / len(recent_events),
             'recent_accuracy_average': sum(e['accuracy_score'] for e in recent_events) / len(recent_events),
@@ -573,7 +573,7 @@ class BusinessKPITracker:
             'manual_review_rate': sum(1 for e in recent_events if e['manual_review_required']) / len(recent_events),
             'sample_size': len(recent_events)
         }
-        
+
         return current_kpis
 ```
 

@@ -326,8 +326,8 @@ class TestContextAwareDescriptionCleaning(unittest.TestCase):
     def test_handles_excessive_artifacts(self):
         """Test handling of descriptions with excessive artifacts"""
         excessive_artifacts = """
-        Product Code XS9826A UPC Description Traditional D-code format 
-        $$ Price $$ Your Price List Price || separator || 
+        Product Code XS9826A UPC Description Traditional D-code format
+        $$ Price $$ Your Price List Price || separator ||
         6"H Metal Ballerina Ornament Holiday Decor
         Qty Price Unit each $$$
         """

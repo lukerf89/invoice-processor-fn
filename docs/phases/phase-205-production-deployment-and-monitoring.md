@@ -57,30 +57,30 @@ graph TD
     A[Production Deployment] --> B{Gradual Rollout Controller}
     B -->|5% Traffic| C[Gemini Processing A/B Test]
     B -->|25% Traffic| D[Expanded Gemini Processing]
-    B -->|50% Traffic| E[Majority Gemini Processing] 
+    B -->|50% Traffic| E[Majority Gemini Processing]
     B -->|100% Traffic| F[Full Gemini Production]
-    
+
     C --> G[A/B Testing Analytics]
     D --> H[Performance Validation]
     E --> I[Scale Testing]
     F --> J[Production Optimization]
-    
+
     G --> K[Statistical Analysis]
     H --> L[Performance Metrics]
     I --> M[Scalability Validation]
     J --> N[Cost Analysis]
-    
+
     K --> O[Rollout Decision Gate]
     L --> O
     M --> O
     N --> O
-    
+
     O -->|Pass| P[Continue Rollout]
     O -->|Fail| Q[Rollback to Previous Stage]
-    
+
     P --> R[Production Monitoring]
     Q --> S[Issue Resolution]
-    
+
     R --> T[Business Impact Analytics]
     S --> U[Corrective Deployment]
 ```
@@ -127,7 +127,7 @@ python deployment_scripts/validate_production_environment.py
 ```python
 class ProductionDeploymentController:
     """Manages gradual rollout and emergency controls for production deployment"""
-    
+
     def __init__(self):
         self.rollout_stages = [
             {'name': 'initial', 'traffic_percentage': 5, 'duration_hours': 24},
@@ -137,60 +137,60 @@ class ProductionDeploymentController:
         ]
         self.current_stage = 'initial'
         self.deployment_start_time = None
-        
+
     def should_use_gemini_processing(self):
         """Determine if request should use Gemini processing based on rollout stage"""
-        
+
         # Get current rollout percentage
         current_percentage = self.get_current_rollout_percentage()
-        
+
         # Use hash of request identifier for consistent routing
         request_hash = self.get_request_hash()
-        
+
         # Route percentage of traffic to Gemini
         return (request_hash % 100) < current_percentage
-    
+
     def get_current_rollout_percentage(self):
         """Get current rollout percentage based on stage and time"""
-        
+
         if not self.deployment_start_time:
             return 0
-        
+
         hours_since_deployment = (time.time() - self.deployment_start_time) / 3600
-        
+
         for stage in self.rollout_stages:
             if self.current_stage == stage['name']:
                 return stage['traffic_percentage']
-        
+
         return 0
-    
+
     def advance_rollout_stage(self, metrics_validation_passed):
         """Advance to next rollout stage if metrics validate success"""
-        
+
         if not metrics_validation_passed:
             print("⚠️ Metrics validation failed - halting rollout")
             return False
-        
-        current_index = next(i for i, stage in enumerate(self.rollout_stages) 
+
+        current_index = next(i for i, stage in enumerate(self.rollout_stages)
                            if stage['name'] == self.current_stage)
-        
+
         if current_index < len(self.rollout_stages) - 1:
             next_stage = self.rollout_stages[current_index + 1]
             self.current_stage = next_stage['name']
             print(f"🚀 Advanced to rollout stage: {self.current_stage} ({next_stage['traffic_percentage']}% traffic)")
             return True
-        
+
         print("✅ Rollout complete - 100% traffic on Gemini processing")
         return True
-    
+
     def emergency_rollback(self, reason):
         """Emergency rollback to Document AI processing only"""
-        
+
         print(f"🚨 EMERGENCY ROLLBACK TRIGGERED: {reason}")
-        
+
         # Immediately disable Gemini processing
         self.current_stage = 'disabled'
-        
+
         # Log emergency rollback
         emergency_log = {
             'timestamp': time.time(),
@@ -198,9 +198,9 @@ class ProductionDeploymentController:
             'previous_stage': self.current_stage,
             'rollback_action': 'disable_gemini_processing'
         }
-        
+
         print(f"📊 EMERGENCY_ROLLBACK: {emergency_log}")
-        
+
         # Could trigger automated rollback deployment here
         return True
 
@@ -209,61 +209,61 @@ production_deployment = ProductionDeploymentController()
 
 def process_invoice_with_production_routing(request):
     """Main processing function with production rollout routing"""
-    
+
     try:
         # Extract PDF content (existing logic)
         pdf_content = extract_pdf_from_request(request)
-        
+
         if not pdf_content:
             return "Error: No PDF content found", 400
-        
+
         # Determine processing method based on rollout stage
         use_gemini = production_deployment.should_use_gemini_processing()
-        
+
         if use_gemini:
             print("🤖 Using Gemini processing (production rollout)")
-            
+
             # Try Gemini processing with timeout management
             gemini_result = process_with_gemini_first_enhanced(pdf_content)
-            
+
             if gemini_result:
                 rows, invoice_date, vendor, invoice_number = gemini_result
-                
+
                 # Apply vendor-specific enhancements
                 enhanced_result = process_vendor_specific_with_gemini(pdf_content, gemini_result)
-                
+
                 if enhanced_result:
                     rows, invoice_date, vendor, invoice_number = enhanced_result
-                
+
                 # Log successful Gemini processing
                 production_metrics.record_processing_success('gemini', pdf_content, rows)
-                
+
                 # Write to Google Sheets
                 write_to_sheet(rows, invoice_date, vendor, invoice_number)
-                
+
                 return f"Successfully processed {len(rows)} line items using Gemini AI", 200
-        
+
         # Fall back to Document AI processing
         print("📄 Using Document AI processing (production fallback)")
-        
+
         # Use existing Document AI processing
         result = process_with_document_ai_fallback(pdf_content)
-        
+
         if result:
             rows, invoice_date, vendor, invoice_number = result
-            
+
             # Log Document AI processing
             production_metrics.record_processing_success('document_ai', pdf_content, rows)
-            
+
             # Write to Google Sheets
             write_to_sheet(rows, invoice_date, vendor, invoice_number)
-            
+
             return f"Successfully processed {len(rows)} line items using Document AI", 200
-        
+
         # Final fallback error
         production_metrics.record_processing_failure(pdf_content, 'all_methods_failed')
         return "Error: All processing methods failed", 500
-        
+
     except Exception as e:
         print(f"❌ Production processing error: {e}")
         production_metrics.record_processing_failure(pdf_content, str(e))
@@ -271,7 +271,7 @@ def process_invoice_with_production_routing(request):
 
 def deploy_to_production_with_rollout():
     """Deploy enhanced processing to production with gradual rollout"""
-    
+
     # Set environment variables for production
     production_env_vars = {
         'GOOGLE_CLOUD_PROJECT_ID': 'freckled-hen-analytics',
@@ -282,7 +282,7 @@ def deploy_to_production_with_rollout():
         'PRODUCTION_ROLLOUT_ENABLED': 'true',
         'GEMINI_ROLLOUT_STAGE': 'initial'
     }
-    
+
     # Deploy with gradual rollout enabled
     deployment_command = f"""
     gcloud functions deploy process_invoice \\
@@ -298,10 +298,10 @@ def deploy_to_production_with_rollout():
         --set-secrets="GEMINI_API_KEY=gemini-api-key:latest" \\
         {' '.join([f'--set-env-vars="{k}={v}"' for k, v in production_env_vars.items()])}
     """
-    
+
     print("🚀 Deploying to production with gradual rollout...")
     print(f"Deployment command: {deployment_command}")
-    
+
     # Execute deployment (would be run in actual deployment)
     # subprocess.run(deployment_command, shell=True)
 ```
@@ -355,7 +355,7 @@ python ab_testing_scripts/monitor_ab_test_results.py
 ```python
 class ABTestingFramework:
     """Comprehensive A/B testing framework for Gemini vs Document AI processing"""
-    
+
     def __init__(self):
         self.test_variants = {
             'control': 'document_ai_only',
@@ -363,54 +363,54 @@ class ABTestingFramework:
         }
         self.test_metrics = [
             'processing_accuracy',
-            'processing_time', 
+            'processing_time',
             'timeout_rate',
             'fallback_rate',
             'cost_per_invoice'
         ]
         self.statistical_confidence = 0.95
         self.minimum_sample_size = 100
-        
+
     def assign_test_variant(self, request_id):
         """Assign request to test variant using consistent hashing"""
-        
+
         # Use hash for consistent assignment
         hash_value = hash(request_id) % 100
-        
+
         # 50/50 split for A/B testing
         if hash_value < 50:
             return 'control'
         else:
             return 'treatment'
-    
+
     def process_with_ab_testing(self, pdf_content, request_id):
         """Process invoice with A/B testing assignment"""
-        
+
         variant = self.assign_test_variant(request_id)
         processing_start_time = time.time()
-        
+
         try:
             if variant == 'control':
                 # Control group: Document AI only
                 print(f"🅰️ Processing with control variant: {variant}")
                 result = process_with_document_ai_only(pdf_content)
                 processing_method = 'document_ai'
-                
+
             else:
                 # Treatment group: Gemini with fallback
                 print(f"🅱️ Processing with treatment variant: {variant}")
-                
+
                 gemini_result = process_with_gemini_first_enhanced(pdf_content)
-                
+
                 if gemini_result:
                     result = gemini_result
                     processing_method = 'gemini'
                 else:
                     result = process_with_document_ai_fallback(pdf_content)
                     processing_method = 'document_ai_fallback'
-            
+
             processing_time = time.time() - processing_start_time
-            
+
             # Record A/B test metrics
             self.record_ab_test_result(
                 request_id=request_id,
@@ -420,31 +420,31 @@ class ABTestingFramework:
                 result=result,
                 pdf_characteristics=analyze_pdf_characteristics(pdf_content)
             )
-            
+
             return result
-            
+
         except Exception as e:
             processing_time = time.time() - processing_start_time
-            
+
             self.record_ab_test_error(
                 request_id=request_id,
                 variant=variant,
                 processing_time=processing_time,
                 error=str(e)
             )
-            
+
             raise e
-    
-    def record_ab_test_result(self, request_id, variant, processing_method, 
+
+    def record_ab_test_result(self, request_id, variant, processing_method,
                              processing_time, result, pdf_characteristics):
         """Record detailed A/B test result for analysis"""
-        
+
         if result:
             rows, invoice_date, vendor, invoice_number = result
             line_item_count = len(rows) if rows else 0
         else:
             line_item_count = 0
-        
+
         test_record = {
             'timestamp': time.time(),
             'request_id': request_id,
@@ -460,44 +460,44 @@ class ABTestingFramework:
             'vendor_detected': vendor if result else None,
             'fallback_used': processing_method == 'document_ai_fallback'
         }
-        
+
         # Store for analysis
         self.store_ab_test_record(test_record)
-        
+
         # Log for monitoring
         print(f"📊 AB_TEST_RESULT: {test_record}")
-    
+
     def calculate_statistical_significance(self, metric_name):
         """Calculate statistical significance for A/B test metric"""
-        
+
         control_data = self.get_ab_test_data('control', metric_name)
         treatment_data = self.get_ab_test_data('treatment', metric_name)
-        
+
         if len(control_data) < self.minimum_sample_size or len(treatment_data) < self.minimum_sample_size:
             return {
                 'significant': False,
                 'reason': f'Insufficient sample size (need {self.minimum_sample_size}, have {len(control_data)}/{len(treatment_data)})'
             }
-        
+
         # Perform statistical test (t-test for continuous metrics)
         from scipy import stats
-        
+
         if metric_name in ['processing_accuracy', 'timeout_rate', 'fallback_rate']:
             # Proportion test for binary metrics
             control_successes = sum(control_data)
             treatment_successes = sum(treatment_data)
-            
+
             # Use chi-square test for proportions
             observed = [[control_successes, len(control_data) - control_successes],
                        [treatment_successes, len(treatment_data) - treatment_successes]]
-            
+
             chi2, p_value = stats.chi2_contingency(observed)[:2]
         else:
             # t-test for continuous metrics
             t_stat, p_value = stats.ttest_ind(control_data, treatment_data)
-        
+
         significant = p_value < (1 - self.statistical_confidence)
-        
+
         return {
             'significant': significant,
             'p_value': p_value,
@@ -506,55 +506,55 @@ class ABTestingFramework:
             'treatment_mean': sum(treatment_data) / len(treatment_data),
             'sample_sizes': {'control': len(control_data), 'treatment': len(treatment_data)}
         }
-    
+
     def analyze_ab_test_results(self):
         """Analyze A/B test results across all metrics"""
-        
+
         results = {}
-        
+
         for metric in self.test_metrics:
             significance_result = self.calculate_statistical_significance(metric)
             results[metric] = significance_result
-        
+
         # Overall recommendation
         significant_improvements = [
-            metric for metric, result in results.items() 
+            metric for metric, result in results.items()
             if result['significant'] and result['treatment_mean'] > result['control_mean']
         ]
-        
+
         significant_regressions = [
             metric for metric, result in results.items()
             if result['significant'] and result['treatment_mean'] < result['control_mean']
         ]
-        
+
         recommendation = self.generate_rollout_recommendation(
             improvements=significant_improvements,
             regressions=significant_regressions,
             results=results
         )
-        
+
         return {
             'metric_results': results,
             'significant_improvements': significant_improvements,
             'significant_regressions': significant_regressions,
             'rollout_recommendation': recommendation
         }
-    
+
     def generate_rollout_recommendation(self, improvements, regressions, results):
         """Generate recommendation for rollout based on A/B test results"""
-        
+
         critical_metrics = ['processing_accuracy', 'timeout_rate']
-        
+
         # Check for critical regressions
         critical_regressions = [r for r in regressions if r in critical_metrics]
-        
+
         if critical_regressions:
             return {
                 'recommendation': 'DO_NOT_ROLLOUT',
                 'reason': f'Critical regressions in: {critical_regressions}',
                 'action': 'Fix issues before proceeding'
             }
-        
+
         # Check for significant improvements
         if 'processing_accuracy' in improvements and 'timeout_rate' not in regressions:
             return {
@@ -562,7 +562,7 @@ class ABTestingFramework:
                 'reason': 'Significant accuracy improvement without timeout regression',
                 'action': 'Continue gradual rollout to next stage'
             }
-        
+
         # Check for mixed results
         if len(improvements) > len(regressions):
             return {
@@ -570,7 +570,7 @@ class ABTestingFramework:
                 'reason': 'More improvements than regressions, but monitor closely',
                 'action': 'Continue rollout with enhanced monitoring'
             }
-        
+
         return {
             'recommendation': 'HOLD_CURRENT_STAGE',
             'reason': 'Insufficient evidence for rollout decision',
@@ -615,7 +615,7 @@ python monitoring_scripts/test_monitoring_systems.py
 ```python
 class ProductionMonitoringSystem:
     """Comprehensive monitoring system for production Gemini processing"""
-    
+
     def __init__(self):
         self.monitoring_metrics = {
             'processing_performance': [
@@ -637,18 +637,18 @@ class ProductionMonitoringSystem:
                 'customer_satisfaction_proxy'
             ]
         }
-        
+
         self.alert_thresholds = {
             'timeout_rate': {'warning': 5, 'critical': 10},  # Percentage
-            'error_rate': {'warning': 2, 'critical': 5},     # Percentage  
+            'error_rate': {'warning': 2, 'critical': 5},     # Percentage
             'gemini_success_rate': {'warning': 70, 'critical': 50},  # Minimum percentage
             'average_processing_time': {'warning': 45, 'critical': 60},  # Seconds
             'fallback_usage_rate': {'warning': 40, 'critical': 60}  # Percentage
         }
-    
+
     def record_production_metrics(self, request_id, processing_result):
         """Record comprehensive production metrics for monitoring"""
-        
+
         metrics_record = {
             'timestamp': time.time(),
             'request_id': request_id,
@@ -662,30 +662,30 @@ class ProductionMonitoringSystem:
             'pdf_characteristics': processing_result.get('pdf_characteristics'),
             'cost_estimate': self.calculate_processing_cost(processing_result)
         }
-        
+
         # Store metrics
         self.store_production_metrics(metrics_record)
-        
+
         # Check for alert conditions
         self.check_alert_conditions(metrics_record)
-        
+
         # Update real-time dashboard
         self.update_dashboard_metrics(metrics_record)
-    
+
     def check_alert_conditions(self, current_metrics):
         """Check current metrics against alert thresholds"""
-        
+
         # Calculate rolling averages for comparison
         rolling_metrics = self.calculate_rolling_metrics(window_minutes=15)
-        
+
         alerts_triggered = []
-        
+
         for metric_name, thresholds in self.alert_thresholds.items():
             current_value = rolling_metrics.get(metric_name)
-            
+
             if current_value is None:
                 continue
-            
+
             if current_value >= thresholds.get('critical', float('inf')):
                 alert = {
                     'severity': 'CRITICAL',
@@ -696,7 +696,7 @@ class ProductionMonitoringSystem:
                 }
                 alerts_triggered.append(alert)
                 self.send_critical_alert(alert)
-                
+
             elif current_value >= thresholds.get('warning', float('inf')):
                 alert = {
                     'severity': 'WARNING',
@@ -707,35 +707,35 @@ class ProductionMonitoringSystem:
                 }
                 alerts_triggered.append(alert)
                 self.send_warning_alert(alert)
-        
+
         return alerts_triggered
-    
+
     def send_critical_alert(self, alert):
         """Send critical alert for immediate attention"""
-        
+
         alert_message = f"""
         🚨 CRITICAL ALERT: {alert['metric']}
-        
+
         Current Value: {alert['current_value']}
         Critical Threshold: {alert['threshold']}
         Time: {time.ctime(alert['timestamp'])}
-        
+
         Action Required: Investigate immediately
         Escalation: Consider emergency rollback if issue persists
         """
-        
+
         print(f"🚨 CRITICAL_ALERT: {alert}")
-        
+
         # Could integrate with Slack, email, or other alerting systems
         self.log_alert('CRITICAL', alert_message)
-    
+
     def calculate_business_impact_metrics(self):
         """Calculate business impact metrics from production data"""
-        
+
         # Get data for comparison period (last 7 days)
         current_period_data = self.get_metrics_for_period(days=7)
         previous_period_data = self.get_metrics_for_period(days=14, offset_days=7)
-        
+
         business_impact = {
             'processing_speed_improvement': self.calculate_speed_improvement(
                 current_period_data, previous_period_data
@@ -753,12 +753,12 @@ class ProductionMonitoringSystem:
                 current_period_data, previous_period_data
             )
         }
-        
+
         return business_impact
-    
+
     def generate_production_report(self):
         """Generate comprehensive production performance report"""
-        
+
         report_data = {
             'summary': {
                 'report_period': '7_days',
@@ -773,17 +773,17 @@ class ProductionMonitoringSystem:
             'alerts_summary': self.get_alerts_summary(),
             'recommendations': self.generate_performance_recommendations()
         }
-        
+
         return report_data
-    
+
     def generate_performance_recommendations(self):
         """Generate actionable recommendations based on production performance"""
-        
+
         recommendations = []
-        
+
         # Analyze performance patterns
         performance_data = self.get_performance_summary()
-        
+
         if performance_data.get('timeout_rate', 0) > 5:
             recommendations.append({
                 'priority': 'HIGH',
@@ -792,7 +792,7 @@ class ProductionMonitoringSystem:
                 'recommendation': 'Reduce Gemini timeout thresholds or improve PDF routing',
                 'action': 'Investigate timeout patterns and optimize processing strategy'
             })
-        
+
         if performance_data.get('fallback_usage_rate', 0) > 50:
             recommendations.append({
                 'priority': 'MEDIUM',
@@ -801,7 +801,7 @@ class ProductionMonitoringSystem:
                 'recommendation': 'Improve Gemini processing success rate or PDF analysis',
                 'action': 'Analyze Gemini failure patterns and enhance prompts'
             })
-        
+
         cost_trend = self.get_cost_trend_analysis()
         if cost_trend.get('increasing_trend', False):
             recommendations.append({
@@ -811,7 +811,7 @@ class ProductionMonitoringSystem:
                 'recommendation': 'Optimize Gemini usage or implement cost controls',
                 'action': 'Review cost per processing method and implement optimization'
             })
-        
+
         return recommendations
 
 # Global production monitoring
@@ -852,10 +852,10 @@ python optimization_scripts/validate_optimization_effectiveness.py
 ```python
 def optimize_production_performance():
     """Implement production performance optimizations based on real data"""
-    
+
     # Analyze production performance patterns
     performance_analysis = analyze_production_performance_patterns()
-    
+
     # Implement targeted optimizations
     optimizations = [
         optimize_gemini_prompt_for_speed(),
@@ -863,7 +863,7 @@ def optimize_production_performance():
         optimize_memory_usage(),
         optimize_cost_efficiency()
     ]
-    
+
     return {
         'analysis': performance_analysis,
         'optimizations': optimizations,
@@ -872,26 +872,26 @@ def optimize_production_performance():
 
 def conduct_comprehensive_scale_testing():
     """Conduct scale testing to validate system performance at target volume"""
-    
+
     scale_test_scenarios = [
         {'name': 'normal_load', 'invoices_per_hour': 10, 'duration_hours': 4},
         {'name': 'peak_load', 'invoices_per_hour': 25, 'duration_hours': 2},
         {'name': 'stress_load', 'invoices_per_hour': 50, 'duration_hours': 1}
     ]
-    
+
     scale_test_results = []
-    
+
     for scenario in scale_test_scenarios:
         print(f"🧪 Running scale test: {scenario['name']}")
-        
+
         test_result = run_scale_test_scenario(scenario)
         scale_test_results.append(test_result)
-        
+
         # Check if system maintains performance under load
         if not validate_scale_test_performance(test_result):
             print(f"⚠️ Scale test {scenario['name']} failed performance criteria")
             break
-    
+
     return {
         'scale_test_results': scale_test_results,
         'scalability_validated': all(r['performance_maintained'] for r in scale_test_results),
@@ -948,7 +948,7 @@ def conduct_comprehensive_scale_testing():
    - **Mitigation**: Conservative timeout thresholds, extensive pre-deployment testing, gradual rollout
    - **Contingency**: Emergency rollback to Document AI, timeout threshold adjustment
 
-2. **A/B Testing Invalid Results** (Probability: Medium, Impact: Medium) 
+2. **A/B Testing Invalid Results** (Probability: Medium, Impact: Medium)
    - **Description**: A/B test results misleading due to sample bias or statistical errors
    - **Mitigation**: Proper statistical methodology, sufficient sample sizes, expert review
    - **Contingency**: Extended testing period, expert statistical analysis, cautious rollout decisions

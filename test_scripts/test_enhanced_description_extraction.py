@@ -453,7 +453,7 @@ class TestEnhancedDescriptionExtraction(unittest.TestCase):
         """Test UPC extraction for specific products"""
         document_with_multiple_upcs = """
         XS9826A 191009727774 6"H Metal Ballerina Ornament
-        XS8911A 191009710615 Cotton Lumbar Pillow  
+        XS8911A 191009710615 Cotton Lumbar Pillow
         XS9482 191009714712 Wood Shoe Ornament
         CF1234A 123456789012 Premium Cotton Product
         """

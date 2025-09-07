@@ -286,7 +286,7 @@ class TestEntityContinuationLogic(unittest.TestCase):
         Page 1:
         XS9826A 6"H Metal Ballerina Ornament
         Quantity: 24
-        
+
         Page 2:
         Price: $1.60
         Extended: $38.40

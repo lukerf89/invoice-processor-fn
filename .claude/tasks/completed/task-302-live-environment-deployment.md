@@ -44,7 +44,7 @@ def test_deployment_prerequisites_validation():
 
     # Assert
     assert can_deploy == True
-    
+
 def test_deployment_aborts_when_not_ready():
     # Test deployment aborts when readiness score below threshold
     mock_validation_results = {'readiness_score': 0.92, 'is_production_ready': False}
@@ -59,10 +59,10 @@ def test_deployment_aborts_when_not_ready():
 def test_deployment_command_generation():
     # Test that proper gcloud deployment command is generated
     deployment_system = ProductionDeploymentSystem()
-    
+
     # Act
     deployment_command = deployment_system.generate_deployment_command()
-    
+
     # Assert
     assert 'gcloud functions deploy process_invoice' in deployment_command
     assert '--gen2' in deployment_command
@@ -91,11 +91,11 @@ def test_live_creative_coop_processing_validation():
     # Test actual Creative-Coop processing in production environment
     production_validator = LiveProductionValidator()
     test_invoice_data = load_test_invoice('CS003837319')
-    
+
     start_time = time.time()
     result = production_validator.test_creative_coop_processing(test_invoice_data)
     processing_time = time.time() - start_time
-    
+
     assert result['processing_successful'] == True
     assert result['accuracy_score'] >= 0.90
     assert processing_time < 120  # 2 minutes for production processing
@@ -105,9 +105,9 @@ def test_live_creative_coop_processing_validation():
 def test_production_performance_validation():
     # Test that production environment meets performance requirements
     performance_validator = ProductionPerformanceValidator()
-    
+
     performance_results = performance_validator.validate_production_performance()
-    
+
     assert performance_results['average_processing_time'] < 60  # Sub-60 second requirement
     assert performance_results['memory_usage_mb'] < 1000  # Under 1GB
     assert performance_results['error_rate'] < 0.05  # Under 5% error rate
@@ -118,24 +118,24 @@ def test_production_performance_validation():
 def test_rollback_trigger_conditions():
     # Test conditions that should trigger automatic rollback
     rollback_system = AutomatedRollbackSystem()
-    
+
     # Test accuracy degradation trigger
     health_metrics = {
         'accuracy_score': 0.75,  # Below 85% threshold
         'processing_time': 45,
         'error_rate': 0.02
     }
-    
+
     should_rollback = rollback_system.should_trigger_rollback(health_metrics)
     assert should_rollback == True
     assert rollback_system.rollback_reason == 'accuracy_degradation'
-    
+
 def test_rollback_execution():
     # Test rollback execution process
     rollback_system = AutomatedRollbackSystem()
-    
+
     rollback_result = rollback_system.execute_rollback('phase_02_backup')
-    
+
     assert rollback_result['rollback_successful'] == True
     assert rollback_result['rollback_duration'] < 300  # 5 minutes max rollback time
     assert rollback_result['post_rollback_validation'] == True
@@ -143,9 +143,9 @@ def test_rollback_execution():
 def test_rollback_validation():
     # Test post-rollback validation
     rollback_validator = RollbackValidator()
-    
+
     validation_result = rollback_validator.validate_post_rollback_state()
-    
+
     assert validation_result['system_functional'] == True
     assert validation_result['processing_restored'] == True
     assert validation_result['accuracy_acceptable'] >= 0.85
@@ -156,9 +156,9 @@ def test_rollback_validation():
 def test_zapier_integration_in_production():
     # Test Zapier integration works in production environment
     zapier_tester = ProductionZapierTester()
-    
+
     integration_result = zapier_tester.test_zapier_webhook_processing()
-    
+
     assert integration_result['webhook_responsive'] == True
     assert integration_result['processing_successful'] == True
     assert integration_result['google_sheets_updated'] == True
@@ -166,9 +166,9 @@ def test_zapier_integration_in_production():
 def test_vendor_regression_in_production():
     # Ensure other vendors still work in production after deployment
     production_tester = ProductionRegressionTester()
-    
+
     vendor_results = production_tester.test_all_vendors_in_production()
-    
+
     for vendor, result in vendor_results.items():
         with subtests.subTest(vendor=vendor):
             assert result['processing_successful'] == True
@@ -181,44 +181,44 @@ def test_vendor_regression_in_production():
 ```python
 class ProductionDeploymentSystem:
     """Orchestrates safe production deployment with validation and rollback."""
-    
+
     def __init__(self):
         self.deployment_config = self._load_deployment_config()
         self.rollback_system = AutomatedRollbackSystem()
-    
+
     def deploy_to_production_safely(self):
         """
         Deploy to production with comprehensive safety checks.
-        
+
         Returns:
             dict: Deployment result with success status and metrics
-            
+
         Raises:
             DeploymentError: If deployment fails or validation fails
         """
         print("🚀 Starting safe production deployment...")
-        
+
         # Step 1: Validate production readiness
         readiness_validation = self._validate_production_readiness()
         if not readiness_validation['is_production_ready']:
             raise DeploymentError(f"Production readiness validation failed: {readiness_validation['failed_validations']}")
-        
+
         # Step 2: Create backup
         backup_result = self._create_deployment_backup()
         print(f"📦 Backup created: {backup_result['backup_identifier']}")
-        
+
         # Step 3: Execute deployment
         deployment_result = self._execute_deployment()
         if not deployment_result['deployment_successful']:
             raise DeploymentError(f"Deployment failed: {deployment_result['error_message']}")
-        
+
         # Step 4: Post-deployment validation
         validation_result = self._validate_post_deployment()
         if not validation_result['validation_successful']:
             print("❌ Post-deployment validation failed, initiating rollback...")
             rollback_result = self.rollback_system.execute_rollback(backup_result['backup_identifier'])
             raise DeploymentError(f"Deployment validation failed, rollback executed: {rollback_result}")
-        
+
         print("✅ Production deployment completed successfully")
         return {
             'deployment_successful': True,
@@ -226,22 +226,22 @@ class ProductionDeploymentSystem:
             'post_deployment_validation': validation_result,
             'deployment_metrics': deployment_result['metrics']
         }
-    
+
     def _validate_production_readiness(self):
         """Validate system is ready for production deployment."""
         from test_scripts.validate_production_deployment_readiness import validate_production_deployment_readiness
         return validate_production_deployment_readiness()
-    
+
     def _execute_deployment(self):
         """Execute the actual gcloud deployment."""
         deployment_command = self._generate_deployment_command()
-        
+
         start_time = time.time()
         try:
             # Execute deployment command (would use subprocess in real implementation)
             result = self._run_deployment_command(deployment_command)
             deployment_time = time.time() - start_time
-            
+
             return {
                 'deployment_successful': True,
                 'deployment_time': deployment_time,
@@ -253,7 +253,7 @@ class ProductionDeploymentSystem:
                 'error_message': str(e),
                 'deployment_time': time.time() - start_time
             }
-    
+
     def _generate_deployment_command(self):
         """Generate gcloud deployment command with proper configuration."""
         return '''
@@ -273,7 +273,7 @@ class ProductionDeploymentSystem:
 
 class PostDeploymentValidator:
     """Validates production deployment success and functionality."""
-    
+
     def validate_post_deployment_health(self):
         """Comprehensive post-deployment validation."""
         validation_tests = {
@@ -283,7 +283,7 @@ class PostDeploymentValidator:
             'vendor_regression': self._test_vendor_regression,
             'zapier_integration': self._test_zapier_integration
         }
-        
+
         validation_results = {}
         for test_name, test_function in validation_tests.items():
             try:
@@ -292,28 +292,28 @@ class PostDeploymentValidator:
             except Exception as e:
                 validation_results[test_name] = False
                 print(f"❌ {test_name}: FAILED - {e}")
-        
+
         overall_success = all(validation_results.values())
-        
+
         return {
             'validation_successful': overall_success,
             'individual_results': validation_results,
             'failed_validations': [k for k, v in validation_results.items() if not v]
         }
-    
+
     def _test_creative_coop_in_production(self):
         """Test Creative-Coop processing in live production environment."""
         # Load CS003837319 test data
         test_invoice_path = "test_invoices/CS003837319.pdf"
-        
+
         start_time = time.time()
         # Simulate production API call
         processing_result = self._call_production_api(test_invoice_path)
         processing_time = time.time() - start_time
-        
+
         # Validate results
         accuracy_score = self._calculate_accuracy(processing_result)
-        
+
         return {
             'processing_time': processing_time < 120,  # 2 minutes
             'accuracy_score': accuracy_score >= 0.90,
@@ -324,7 +324,7 @@ class PostDeploymentValidator:
 
 class AutomatedRollbackSystem:
     """Handles automated rollback in case of deployment issues."""
-    
+
     def should_trigger_rollback(self, health_metrics):
         """Determine if rollback should be triggered based on health metrics."""
         rollback_triggers = {
@@ -332,39 +332,39 @@ class AutomatedRollbackSystem:
             'performance_degradation': health_metrics.get('processing_time', 0) > 120,
             'high_error_rate': health_metrics.get('error_rate', 0) > 0.10
         }
-        
+
         for trigger_name, should_trigger in rollback_triggers.items():
             if should_trigger:
                 self.rollback_reason = trigger_name
                 return True
-        
+
         return False
-    
+
     def execute_rollback(self, backup_identifier):
         """Execute automated rollback to previous stable version."""
         print(f"🚨 Executing rollback to {backup_identifier}...")
-        
+
         start_time = time.time()
-        
+
         try:
             # Restore backup
             self._restore_backup(backup_identifier)
-            
+
             # Redeploy previous version
             rollback_deployment = self._deploy_rollback_version()
-            
+
             # Validate rollback success
             rollback_validation = self._validate_rollback()
-            
+
             rollback_time = time.time() - start_time
-            
+
             return {
                 'rollback_successful': rollback_validation,
                 'rollback_duration': rollback_time,
                 'rollback_reason': getattr(self, 'rollback_reason', 'unknown'),
                 'post_rollback_validation': rollback_validation
             }
-            
+
         except Exception as e:
             return {
                 'rollback_successful': False,

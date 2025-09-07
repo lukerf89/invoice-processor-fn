@@ -54,24 +54,24 @@ graph TD
     B -->|Simple PDF| C[Gemini 2.5 Flash Processing]
     B -->|Complex PDF| D[Gemini Chunked Processing]
     B -->|High Risk| E[Direct Document AI]
-    
+
     C -->|Success < 30s| F[Parse Gemini Response]
     C -->|Timeout/Error| G[Document AI Entities]
-    
+
     D -->|All Chunks Success| H[Combine Chunk Results]
     D -->|Any Chunk Fails| G
     H --> F
-    
+
     F --> I[Vendor-Specific Enhancement]
     G -->|Success| I
     G -->|Fail| J[Document AI Tables]
     J -->|Success| I
     J -->|Fail| K[Text Pattern Extraction]
     K --> I
-    
+
     I --> L[Data Validation & Quality Check]
     L --> M[Google Sheets Output]
-    
+
     F --> N[Success Metrics Logging]
     G --> O[Fallback Metrics Logging]
     N --> P[Performance Analytics]
@@ -121,17 +121,17 @@ python test_scripts/test_gemini_response_parsing.py
 ```python
 def process_with_gemini_first_enhanced(pdf_content):
     """Enhanced Gemini processing with timeout management and robust error handling"""
-    
+
     import time
     import json
     from contextlib import timeout_context
-    
+
     processing_start_time = time.time()
-    
+
     try:
         # Get PDF analysis from Phase 03 infrastructure
         pdf_analysis = analyze_pdf_characteristics(pdf_content)
-        
+
         # Check if Gemini processing is recommended
         if pdf_analysis['recommended_strategy'] == 'document_ai':
             print("📊 PDF analysis recommends Document AI - skipping Gemini")
@@ -139,42 +139,42 @@ def process_with_gemini_first_enhanced(pdf_content):
                 pdf_analysis, 'document_ai_preemptive', 0, 'strategy_skip'
             )
             return None
-        
+
         # Configure Gemini with enhanced settings
         api_key = get_secret_manager_secret("gemini-api-key")
         if not api_key:
             print("⚠️ GEMINI_API_KEY not accessible, falling back to Document AI")
             return None
-        
+
         genai.configure(api_key=api_key)
-        
+
         # Use Gemini 2.5 Flash for reduced latency (PRD requirement)
         model = genai.GenerativeModel("gemini-1.5-flash")
-        
+
         # Get timeout based on PDF analysis and strategy
         timeout_seconds = processing_metrics.get_recommended_timeout(
             pdf_analysis, pdf_analysis['recommended_strategy']
         )
-        
+
         print(f"🤖 Starting Gemini 2.5 Flash processing with {timeout_seconds}s timeout")
-        
+
         # Process with timeout management
         with timeout_context(timeout_seconds) as (timeout_event, result_container):
-            
+
             if pdf_analysis['recommended_strategy'] == 'gemini_chunked':
                 result = process_gemini_with_chunking_enhanced(pdf_content, model, timeout_event)
             else:
                 result = process_gemini_standard_enhanced(pdf_content, model, timeout_event)
-            
+
             processing_time = time.time() - processing_start_time
-            
+
             if timeout_event.is_set():
                 print(f"⚠️ Gemini processing timed out after {processing_time:.1f}s")
                 processing_metrics.record_processing_attempt(
                     pdf_analysis, pdf_analysis['recommended_strategy'], processing_time, 'timeout'
                 )
                 return None
-            
+
             if result is not None:
                 print(f"✅ Gemini processing completed in {processing_time:.1f}s")
                 processing_metrics.record_processing_attempt(
@@ -187,7 +187,7 @@ def process_with_gemini_first_enhanced(pdf_content):
                     pdf_analysis, pdf_analysis['recommended_strategy'], processing_time, 'empty_result'
                 )
                 return None
-                
+
     except Exception as e:
         processing_time = time.time() - processing_start_time
         print(f"❌ Gemini processing failed after {processing_time:.1f}s: {e}")
@@ -198,46 +198,46 @@ def process_with_gemini_first_enhanced(pdf_content):
 
 def process_gemini_standard_enhanced(pdf_content, model, timeout_event):
     """Enhanced standard Gemini processing with improved prompt and error handling"""
-    
+
     try:
         # Enhanced prompt with vendor-specific guidance
         prompt = get_enhanced_gemini_prompt()
-        
+
         # Check timeout before processing
         if timeout_event.is_set():
             return None
-        
+
         # Generate content with timeout monitoring
         response = model.generate_content([prompt, pdf_content])
-        
+
         # Check timeout after processing
         if timeout_event.is_set():
             return None
-        
+
         # Parse and validate response
         parsed_result = parse_gemini_response_enhanced(response)
-        
+
         if parsed_result is None:
             print("⚠️ Failed to parse Gemini response")
             return None
-        
+
         # Convert to standard format for downstream processing
         standardized_result = convert_gemini_to_standard_format(parsed_result)
-        
+
         return standardized_result
-        
+
     except Exception as e:
         print(f"❌ Standard Gemini processing error: {e}")
         return None
 
 def get_enhanced_gemini_prompt():
     """Enhanced prompt with vendor-specific optimization and improved formatting"""
-    
+
     return """You are an expert invoice parser specializing in vendor-specific invoice formats. Extract product information for Google Sheets output.
 
 REQUIRED FIELDS:
 * Order date (Format: MM/DD/YYYY, extract from invoice header/footer)
-* Vendor (Business name from invoice header, NOT distributor/billing address)  
+* Vendor (Business name from invoice header, NOT distributor/billing address)
 * INV (Invoice number, PO number, or order identifier)
 * Item (Combine SKU/ISBN/UPC + product name + additional identifiers, separated by " - ")
 * Wholesale (Per-unit price - look for "Your Price", "Unit Price", "Net Price", remove currency symbols)
@@ -262,7 +262,7 @@ REQUIRED JSON FORMAT:
 {
   "order_date": "MM/DD/YYYY",
   "vendor": "Vendor Business Name",
-  "invoice_number": "Invoice/Order Number", 
+  "invoice_number": "Invoice/Order Number",
   "line_items": [
     {
       "item": "SKU - Product Name - Additional Info",
@@ -282,17 +282,17 @@ Extract from this invoice:"""
 
 def parse_gemini_response_enhanced(response):
     """Enhanced Gemini response parsing with robust error handling"""
-    
+
     try:
         if not response or not response.text:
             print("⚠️ Empty Gemini response")
             return None
-        
+
         response_text = response.text.strip()
-        
+
         # Clean common response formatting issues
         response_text = clean_gemini_response_text(response_text)
-        
+
         # Attempt to parse JSON
         try:
             parsed_json = json.loads(response_text)
@@ -304,42 +304,42 @@ def parse_gemini_response_enhanced(response):
                 parsed_json = json.loads(extracted_json)
             else:
                 return None
-        
+
         # Validate JSON structure
         if not validate_gemini_json_structure(parsed_json):
             print("⚠️ Invalid Gemini JSON structure")
             return None
-        
+
         return parsed_json
-        
+
     except Exception as e:
         print(f"❌ Gemini response parsing error: {e}")
         return None
 
 def clean_gemini_response_text(text):
     """Clean common formatting issues in Gemini responses"""
-    
+
     # Remove markdown code blocks
     text = re.sub(r'```json\s*', '', text)
     text = re.sub(r'```\s*', '', text)
-    
+
     # Remove common prefixes
     text = re.sub(r'^.*?(?=\{)', '', text, flags=re.DOTALL)
-    
+
     # Remove trailing text after JSON
     text = re.sub(r'\}.*?$', '}', text, flags=re.DOTALL)
-    
+
     return text.strip()
 
 def extract_json_from_text(text):
     """Extract JSON object from text that may contain other content"""
-    
+
     import re
-    
+
     # Look for JSON object pattern
     json_pattern = r'\{.*?\}'
     matches = re.findall(json_pattern, text, re.DOTALL)
-    
+
     for match in matches:
         try:
             # Test if this is valid JSON
@@ -347,64 +347,64 @@ def extract_json_from_text(text):
             return match
         except json.JSONDecodeError:
             continue
-    
+
     return None
 
 def validate_gemini_json_structure(json_data):
     """Validate that Gemini response has required structure"""
-    
+
     if not isinstance(json_data, dict):
         return False
-    
+
     required_fields = ['order_date', 'vendor', 'invoice_number', 'line_items']
-    
+
     for field in required_fields:
         if field not in json_data:
             print(f"⚠️ Missing required field: {field}")
             return False
-    
+
     if not isinstance(json_data['line_items'], list):
         print("⚠️ line_items must be a list")
         return False
-    
+
     # Validate line items structure
     for item in json_data['line_items']:
         if not isinstance(item, dict):
             return False
-        
+
         required_item_fields = ['item', 'wholesale', 'qty_ordered']
         for field in required_item_fields:
             if field not in item:
                 print(f"⚠️ Line item missing field: {field}")
                 return False
-    
+
     return True
 
 def convert_gemini_to_standard_format(gemini_result):
     """Convert Gemini response to standard format expected by downstream processing"""
-    
+
     try:
         # Extract metadata
         invoice_date = gemini_result.get('order_date', '')
         vendor = gemini_result.get('vendor', '')
         invoice_number = gemini_result.get('invoice_number', '')
-        
+
         # Convert line items to standard format
         rows = []
         for item in gemini_result.get('line_items', []):
             # Skip items with missing or invalid data
             if not item.get('item') or not item.get('wholesale'):
                 continue
-            
+
             row = [
                 item.get('item', ''),
                 item.get('wholesale', ''),
                 item.get('qty_ordered', '')
             ]
             rows.append(row)
-        
+
         return (rows, invoice_date, vendor, invoice_number)
-        
+
     except Exception as e:
         print(f"❌ Format conversion error: {e}")
         return None
@@ -424,7 +424,7 @@ python -c "
 import re
 with open('main.py', 'r') as f:
     content = f.read()
-    
+
 # Add return None at start of function
 content = re.sub(
     r'(def process_with_gemini_first.*?\n.*?try:)',
@@ -460,7 +460,7 @@ python test_scripts/test_vendor_specific_gemini_optimization.py
 # Step 2: Validate HarperCollins Gemini processing
 python test_scripts/test_harpercollins_gemini_processing.py
 
-# Step 3: Validate Creative-Coop Gemini processing  
+# Step 3: Validate Creative-Coop Gemini processing
 python test_scripts/test_creative_coop_gemini_processing.py
 
 # Step 4: Validate OneHundred80 and Rifle Paper Gemini processing
@@ -475,18 +475,18 @@ python test_scripts/test_vendor_gemini_fallback_integration.py
 ```python
 def process_vendor_specific_with_gemini(pdf_content, gemini_result):
     """Enhance Gemini results with vendor-specific processing logic"""
-    
+
     try:
         if not gemini_result:
             return None
-        
+
         rows, invoice_date, vendor, invoice_number = gemini_result
-        
+
         # Detect vendor type from Gemini-extracted vendor name
         vendor_type = detect_vendor_type_enhanced(vendor, pdf_content)
-        
+
         print(f"🏪 Detected vendor type: {vendor_type}")
-        
+
         # Apply vendor-specific enhancements to Gemini results
         if vendor_type == 'harpercollins':
             enhanced_result = enhance_harpercollins_gemini_result(rows, invoice_date, vendor, invoice_number, pdf_content)
@@ -499,39 +499,39 @@ def process_vendor_specific_with_gemini(pdf_content, gemini_result):
         else:
             # Generic enhancement for unknown vendors
             enhanced_result = enhance_generic_gemini_result(rows, invoice_date, vendor, invoice_number, pdf_content)
-        
+
         return enhanced_result
-        
+
     except Exception as e:
         print(f"❌ Vendor-specific Gemini enhancement failed: {e}")
         return gemini_result  # Return original result if enhancement fails
 
 def enhance_harpercollins_gemini_result(rows, invoice_date, vendor, invoice_number, pdf_content):
     """Enhance Gemini results for HarperCollins invoices"""
-    
+
     try:
         enhanced_rows = []
-        
+
         for row in rows:
             item, wholesale, qty_ordered = row
-            
+
             # Extract ISBN from item if present
             isbn_match = re.search(r'\b(978\d{10}|\d{10}|\d{13})\b', item)
             if isbn_match:
                 isbn = isbn_match.group()
-                
+
                 # Get HarperCollins book data if available
                 book_data = get_harpercollins_book_data(isbn)
                 if book_data:
                     # Enhance with ISBN; Title format
                     enhanced_item = f"{isbn}; {book_data['title']}"
-                    
+
                     # Use discount calculation if wholesale price seems high
                     if book_data.get('list_price') and wholesale:
                         try:
                             wholesale_price = float(wholesale)
                             list_price = float(book_data['list_price'])
-                            
+
                             # Check if this looks like a discount price (around 50% off)
                             if abs(wholesale_price - (list_price * 0.5)) < (list_price * 0.1):
                                 enhanced_wholesale = str(wholesale_price)
@@ -541,55 +541,55 @@ def enhance_harpercollins_gemini_result(rows, invoice_date, vendor, invoice_numb
                             enhanced_wholesale = wholesale
                     else:
                         enhanced_wholesale = wholesale
-                    
+
                     enhanced_rows.append([enhanced_item, enhanced_wholesale, qty_ordered])
                 else:
                     enhanced_rows.append(row)
             else:
                 enhanced_rows.append(row)
-        
+
         # Extract order number if not found by Gemini
         if not invoice_number or not invoice_number.startswith('NS'):
             order_number = extract_order_number_improved(pdf_content)
             if order_number:
                 invoice_number = order_number
-        
+
         # Enhance date if not found
         if not invoice_date:
             order_date = extract_order_date_improved(pdf_content)
             if order_date:
                 invoice_date = order_date
-        
+
         return (enhanced_rows, invoice_date, vendor, invoice_number)
-        
+
     except Exception as e:
         print(f"⚠️ HarperCollins enhancement failed: {e}")
         return (rows, invoice_date, vendor, invoice_number)
 
 def enhance_creative_coop_gemini_result(rows, invoice_date, vendor, invoice_number, pdf_content):
     """Enhance Gemini results for Creative-Coop invoices with Phase 02 integration"""
-    
+
     try:
         enhanced_rows = []
-        
+
         # Get full document text for product mapping
         full_text = extract_text_from_pdf(pdf_content)
-        
+
         for row in rows:
             item, wholesale, qty_ordered = row
-            
+
             # Try to extract UPC code from item description
             upc_match = re.search(r'\b\d{12}\b', item)
-            
+
             if not upc_match:
                 # Try to find UPC using Creative-Coop product mapping
                 product_mappings = extract_creative_coop_product_mappings_corrected(full_text)
-                
+
                 # Look for product code in item description
                 product_code_match = re.search(r'\b[A-Z]{2,}\d+[A-Z]*\b', item)
                 if product_code_match:
                     product_code = product_code_match.group()
-                    
+
                     # Find UPC for this product code
                     for mapping in product_mappings:
                         if product_code in mapping.get('product_code', ''):
@@ -605,29 +605,29 @@ def enhance_creative_coop_gemini_result(rows, invoice_date, vendor, invoice_numb
                     enhanced_rows.append(row)
             else:
                 enhanced_rows.append(row)
-        
+
         return (enhanced_rows, invoice_date, vendor, invoice_number)
-        
+
     except Exception as e:
         print(f"⚠️ Creative-Coop enhancement failed: {e}")
         return (rows, invoice_date, vendor, invoice_number)
 
 def enhance_onehundred80_gemini_result(rows, invoice_date, vendor, invoice_number, pdf_content):
     """Enhance Gemini results for OneHundred80 invoices"""
-    
+
     try:
         enhanced_rows = []
         full_text = extract_text_from_pdf(pdf_content)
-        
+
         for row in rows:
             item, wholesale, qty_ordered = row
-            
+
             # Extract UPC if not already present
             if not re.search(r'\b\d{12}\b', item):
                 # Look for 12-digit UPC in surrounding text
                 upc_pattern = r'\b\d{12}\b'
                 upc_matches = re.findall(upc_pattern, full_text)
-                
+
                 if upc_matches:
                     # Use first UPC found (could be enhanced with better matching)
                     upc_code = upc_matches[0]
@@ -637,72 +637,72 @@ def enhance_onehundred80_gemini_result(rows, invoice_date, vendor, invoice_numbe
                     enhanced_rows.append(row)
             else:
                 enhanced_rows.append(row)
-        
+
         # Use PO number as invoice number if not found
         if not invoice_number:
             po_match = re.search(r'PO[#\s]*(\d+)', full_text, re.IGNORECASE)
             if po_match:
                 invoice_number = po_match.group(1)
-        
+
         return (enhanced_rows, invoice_date, vendor, invoice_number)
-        
+
     except Exception as e:
         print(f"⚠️ OneHundred80 enhancement failed: {e}")
         return (rows, invoice_date, vendor, invoice_number)
 
 def enhance_rifle_paper_gemini_result(rows, invoice_date, vendor, invoice_number, pdf_content):
     """Enhance Gemini results for Rifle Paper invoices"""
-    
+
     try:
         enhanced_rows = []
-        
+
         for row in rows:
             item, wholesale, qty_ordered = row
-            
+
             # Clean description using existing Rifle Paper logic
             cleaned_item = clean_item_description(item)
             enhanced_rows.append([cleaned_item, wholesale, qty_ordered])
-        
+
         return (enhanced_rows, invoice_date, vendor, invoice_number)
-        
+
     except Exception as e:
         print(f"⚠️ Rifle Paper enhancement failed: {e}")
         return (rows, invoice_date, vendor, invoice_number)
 
 def enhance_generic_gemini_result(rows, invoice_date, vendor, invoice_number, pdf_content):
     """Generic enhancement for unknown vendor types"""
-    
+
     try:
         enhanced_rows = []
-        
+
         for row in rows:
             item, wholesale, qty_ordered = row
-            
+
             # Basic cleaning and validation
             cleaned_item = item.strip()
             cleaned_wholesale = wholesale.strip() if wholesale else ''
             cleaned_qty = qty_ordered.strip() if qty_ordered else ''
-            
+
             # Remove currency symbols from wholesale
             cleaned_wholesale = re.sub(r'[$€£¥]', '', cleaned_wholesale)
-            
+
             enhanced_rows.append([cleaned_item, cleaned_wholesale, cleaned_qty])
-        
+
         return (enhanced_rows, invoice_date, vendor, invoice_number)
-        
+
     except Exception as e:
         print(f"⚠️ Generic enhancement failed: {e}")
         return (rows, invoice_date, vendor, invoice_number)
 
 def detect_vendor_type_enhanced(vendor_name, pdf_content):
     """Enhanced vendor detection using Gemini-extracted vendor name and PDF content"""
-    
+
     if not vendor_name:
         # Fallback to existing vendor detection
         return detect_vendor_type(pdf_content)
-    
+
     vendor_lower = vendor_name.lower()
-    
+
     # Vendor detection patterns
     if any(keyword in vendor_lower for keyword in ['harpercollins', 'harper collins', 'anne mcgilvray']):
         return 'harpercollins'
@@ -755,87 +755,87 @@ python test_scripts/test_gemini_concurrent_processing.py
 ```python
 def run_comprehensive_gemini_validation():
     """Comprehensive validation of Gemini integration across all scenarios"""
-    
+
     test_results = {
         'vendor_tests': {},
         'performance_tests': {},
         'fallback_tests': {},
         'accuracy_tests': {}
     }
-    
+
     # Test all vendor types
     vendors = ['harpercollins', 'creative_coop', 'onehundred80', 'rifle_paper']
-    
+
     for vendor in vendors:
         print(f"🧪 Testing {vendor} Gemini integration...")
-        
+
         vendor_results = test_vendor_gemini_integration(vendor)
         test_results['vendor_tests'][vendor] = vendor_results
-        
+
         if not vendor_results['success']:
             print(f"❌ {vendor} integration failed: {vendor_results['error']}")
         else:
             print(f"✅ {vendor} integration successful: {vendor_results['accuracy']}% accuracy")
-    
+
     # Test performance compliance
     print("🚀 Testing performance compliance...")
     performance_results = test_gemini_performance_compliance()
     test_results['performance_tests'] = performance_results
-    
+
     # Test fallback reliability
     print("🔄 Testing fallback reliability...")
     fallback_results = test_gemini_fallback_scenarios()
     test_results['fallback_tests'] = fallback_results
-    
+
     # Test accuracy against baselines
     print("📊 Testing accuracy against baselines...")
     accuracy_results = test_gemini_accuracy_baselines()
     test_results['accuracy_tests'] = accuracy_results
-    
+
     return test_results
 
 def test_vendor_gemini_integration(vendor_type):
     """Test Gemini integration for specific vendor type"""
-    
+
     try:
         # Get test invoices for vendor
         test_invoices = get_vendor_test_invoices(vendor_type)
-        
+
         if not test_invoices:
             return {'success': False, 'error': f'No test invoices for {vendor_type}'}
-        
+
         successful_tests = 0
         total_tests = len(test_invoices)
         accuracy_scores = []
-        
+
         for invoice_path in test_invoices:
             try:
                 # Process with Gemini
                 with open(invoice_path, 'rb') as f:
                     pdf_content = f.read()
-                
+
                 gemini_result = process_with_gemini_first_enhanced(pdf_content)
-                
+
                 if gemini_result:
                     # Apply vendor-specific processing
                     enhanced_result = process_vendor_specific_with_gemini(pdf_content, gemini_result)
-                    
+
                     if enhanced_result:
                         # Calculate accuracy against expected results
                         accuracy = calculate_vendor_accuracy(vendor_type, invoice_path, enhanced_result)
                         accuracy_scores.append(accuracy)
-                        
+
                         if accuracy >= 85:  # Minimum acceptable accuracy
                             successful_tests += 1
-                
+
             except Exception as e:
                 print(f"⚠️ Test failed for {invoice_path}: {e}")
-        
+
         if accuracy_scores:
             avg_accuracy = sum(accuracy_scores) / len(accuracy_scores)
         else:
             avg_accuracy = 0
-        
+
         return {
             'success': successful_tests > 0,
             'total_tests': total_tests,
@@ -843,35 +843,35 @@ def test_vendor_gemini_integration(vendor_type):
             'accuracy': avg_accuracy,
             'success_rate': (successful_tests / total_tests) * 100 if total_tests > 0 else 0
         }
-        
+
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
 def test_gemini_performance_compliance():
     """Test Gemini performance compliance with timeout requirements"""
-    
+
     try:
         test_cases = [
             {'name': 'simple_invoice', 'max_time': 20, 'pdf_size': 'small'},
             {'name': 'medium_invoice', 'max_time': 30, 'pdf_size': 'medium'},
             {'name': 'complex_invoice', 'max_time': 35, 'pdf_size': 'large'}
         ]
-        
+
         performance_results = []
-        
+
         for test_case in test_cases:
             test_invoices = get_test_invoices_by_size(test_case['pdf_size'])
-            
+
             for invoice_path in test_invoices[:3]:  # Test 3 of each size
                 start_time = time.time()
-                
+
                 with open(invoice_path, 'rb') as f:
                     pdf_content = f.read()
-                
+
                 result = process_with_gemini_first_enhanced(pdf_content)
-                
+
                 processing_time = time.time() - start_time
-                
+
                 performance_results.append({
                     'test_case': test_case['name'],
                     'invoice': invoice_path,
@@ -880,24 +880,24 @@ def test_gemini_performance_compliance():
                     'compliant': processing_time <= test_case['max_time'],
                     'success': result is not None
                 })
-        
+
         # Calculate compliance rate
         compliant_tests = [r for r in performance_results if r['compliant']]
         compliance_rate = (len(compliant_tests) / len(performance_results)) * 100 if performance_results else 0
-        
+
         return {
             'total_tests': len(performance_results),
             'compliant_tests': len(compliant_tests),
             'compliance_rate': compliance_rate,
             'results': performance_results
         }
-        
+
     except Exception as e:
         return {'error': str(e)}
 
 def test_gemini_fallback_scenarios():
     """Test fallback scenarios to ensure reliability"""
-    
+
     try:
         fallback_scenarios = [
             {'name': 'gemini_timeout', 'simulate': 'timeout'},
@@ -905,25 +905,25 @@ def test_gemini_fallback_scenarios():
             {'name': 'gemini_invalid_response', 'simulate': 'invalid_response'},
             {'name': 'gemini_empty_response', 'simulate': 'empty_response'}
         ]
-        
+
         fallback_results = []
-        
+
         for scenario in fallback_scenarios:
             # Test with simulated failures
             test_result = simulate_gemini_failure_scenario(scenario)
             fallback_results.append(test_result)
-        
+
         # Calculate fallback success rate
         successful_fallbacks = [r for r in fallback_results if r['fallback_successful']]
         fallback_success_rate = (len(successful_fallbacks) / len(fallback_results)) * 100
-        
+
         return {
             'total_scenarios': len(fallback_scenarios),
             'successful_fallbacks': len(successful_fallbacks),
             'fallback_success_rate': fallback_success_rate,
             'scenario_results': fallback_results
         }
-        
+
     except Exception as e:
         return {'error': str(e)}
 ```
@@ -950,7 +950,7 @@ vendor_disable_code = '''
 VENDOR_GEMINI_DISABLED = {
     'harpercollins': False,  # Change to True to disable
     'creative_coop': False,
-    'onehundred80': False, 
+    'onehundred80': False,
     'rifle_paper': False
 }
 '''
@@ -989,23 +989,23 @@ python test_scripts/validate_gemini_performance_improvements.py
 ```python
 def optimize_gemini_processing():
     """Implement performance optimizations for Gemini processing"""
-    
+
     optimization_strategies = [
         'prompt_optimization',
         'response_parsing_optimization',
         'memory_optimization',
         'concurrent_processing_optimization'
     ]
-    
+
     for strategy in optimization_strategies:
         print(f"🔧 Implementing {strategy}...")
         implement_optimization_strategy(strategy)
-    
+
     print("✅ Gemini processing optimization complete")
 
 def implement_optimization_strategy(strategy):
     """Implement specific optimization strategy"""
-    
+
     if strategy == 'prompt_optimization':
         # Optimize prompt for faster processing
         optimize_gemini_prompt_performance()
@@ -1021,25 +1021,25 @@ def implement_optimization_strategy(strategy):
 
 def optimize_gemini_prompt_performance():
     """Optimize Gemini prompt for faster processing while maintaining accuracy"""
-    
+
     # Implement more focused, concise prompt that reduces processing time
     # while maintaining extraction accuracy
     pass
 
 def enhance_gemini_monitoring_dashboard():
     """Enhance monitoring with Gemini-specific metrics and analytics"""
-    
+
     gemini_metrics = [
         'processing_success_rate_by_vendor',
-        'timeout_rate_by_pdf_characteristics', 
+        'timeout_rate_by_pdf_characteristics',
         'accuracy_trends_by_processing_method',
         'cost_analysis_gemini_vs_document_ai',
         'fallback_trigger_analysis'
     ]
-    
+
     for metric in gemini_metrics:
         implement_monitoring_metric(metric)
-    
+
     print("📊 Enhanced Gemini monitoring dashboard implemented")
 ```
 
@@ -1152,7 +1152,7 @@ def enhance_gemini_monitoring_dashboard():
 ## Reference Documents
 
 - `/docs/architecture/universal-engineering-principles.md`
-- `/CLAUDE.md` - Project documentation and current system status  
+- `/CLAUDE.md` - Project documentation and current system status
 - `/docs/phases/phase-03-gemini-timeout-resolution-foundation.md` - Prerequisites infrastructure
 - `/docs/prds/gemini-ai-primary-processing-prd.md` - Original requirements
 

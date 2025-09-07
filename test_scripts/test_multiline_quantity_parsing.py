@@ -108,7 +108,7 @@ class TestMultiLineQuantityParsing(unittest.TestCase):
         Description: 6"H Metal Ballerina Ornament
         Quantities:
         - Ordered: 48
-        - Allocated: 24  
+        - Allocated: 24
         - Shipped: 18
         - Backordered: 30
         Unit: each

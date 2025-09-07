@@ -86,11 +86,11 @@ def test_cs003837319_production_processing_validation():
 def test_multi_page_processing_performance():
     # Test that 15-page Creative-Coop documents process within limits
     large_document = "test_invoices/CS003837319.pdf"  # 15 pages
-    
+
     start_time = time.time()
     result = process_large_creative_coop_document(large_document)
     processing_time = time.time() - start_time
-    
+
     assert processing_time < 120  # 2 minutes for large documents
     assert result['memory_efficiency'] == True
     assert len(result['line_items']) >= 130
@@ -105,7 +105,7 @@ def test_vendor_regression_validation():
         'OneHundred80': 'test_invoices/OneHundred80_sample.pdf',
         'Rifle_Paper': 'test_invoices/Rifle_Paper_sample.pdf'
     }
-    
+
     for vendor, test_file in test_vendors.items():
         with subtests.subTest(vendor=vendor):
             result = validate_vendor_processing(test_file)
@@ -119,26 +119,26 @@ def test_vendor_regression_validation():
 def test_memory_usage_compliance():
     # Test that memory usage stays within Cloud Functions limits
     test_invoice = "test_invoices/CS003837319.pdf"
-    
+
     memory_tracker = MemoryUsageTracker()
     memory_tracker.start_tracking()
-    
+
     result = process_creative_coop_document(test_invoice)
-    
+
     peak_memory = memory_tracker.get_peak_memory_mb()
     memory_tracker.stop_tracking()
-    
+
     assert peak_memory < 1000  # Under 1GB limit
     assert result['processing_successful'] == True
 
 def test_concurrent_processing_capability():
     # Test that system can handle multiple concurrent requests
     test_invoices = ["test_invoices/CS003837319.pdf"] * 3
-    
+
     start_time = time.time()
     results = process_invoices_concurrently(test_invoices, max_workers=3)
     total_time = time.time() - start_time
-    
+
     assert len(results) == 3
     assert all(result['accuracy_score'] >= 0.90 for result in results)
     assert total_time < 180  # 3 minutes for 3 concurrent processes
@@ -151,10 +151,10 @@ def test_concurrent_processing_capability():
 def validate_production_deployment_readiness():
     """
     Comprehensive validation before production deployment.
-    
+
     Returns:
         dict: Validation results with readiness score and detailed metrics
-        
+
     Raises:
         ValidationError: If critical validation steps fail
     """
@@ -169,7 +169,7 @@ def validate_production_deployment_readiness():
         'memory_usage': test_memory_efficiency,
         'vendor_regression': test_other_vendor_processing
     }
-    
+
     validation_results = {}
     for test_name, test_function in validation_tests.items():
         try:
@@ -178,9 +178,9 @@ def validate_production_deployment_readiness():
         except Exception as e:
             validation_results[test_name] = False
             print(f"❌ {test_name}: FAILED - {e}")
-    
+
     readiness_score = calculate_production_readiness_score(validation_results)
-    
+
     return {
         'readiness_score': readiness_score,
         'is_production_ready': readiness_score >= 0.95,
@@ -197,18 +197,18 @@ def calculate_production_readiness_score(validation_results):
 def validate_creative_coop_production_processing(test_invoice_path):
     """Validate Creative-Coop processing meets production standards."""
     start_time = time.time()
-    
+
     # Load and process test invoice
     with open(test_invoice_path, 'rb') as f:
         invoice_data = f.read()
-    
+
     # Process using existing Creative-Coop logic
     processing_result = process_creative_coop_document(invoice_data)
     processing_time = time.time() - start_time
-    
+
     # Calculate accuracy metrics
     accuracy_score = calculate_creative_coop_accuracy(processing_result)
-    
+
     return {
         'processing_time': processing_time,
         'accuracy_score': accuracy_score,

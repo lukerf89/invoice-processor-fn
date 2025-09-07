@@ -11,7 +11,7 @@
 
 ### 1. Prerequisites Validation
 - [ ] Google Cloud Function deployment environment ready
-- [ ] Current Document AI processor configured and tested  
+- [ ] Current Document AI processor configured and tested
 - [ ] Google Sheets API access verified and functional
 - [ ] Comprehensive test invoice datasets available for all vendors (HarperCollins, Creative-Coop, OneHundred80, Rifle Paper)
 - [ ] Google Secret Manager configured with Gemini API keys
@@ -74,7 +74,7 @@ graph TD
 
 ### Technical Integration Points
 - **PDF Analysis**: Intelligent size and complexity assessment for processing method routing
-- **Timeout Management**: 30-second hard timeout for Gemini with fast-fail detection mechanisms  
+- **Timeout Management**: 30-second hard timeout for Gemini with fast-fail detection mechanisms
 - **Chunking Strategy**: Page-based and content-aware PDF splitting for large invoices
 - **Performance Monitoring**: Real-time processing time tracking with timeout prediction
 - **Fallback Orchestration**: Seamless transition between processing tiers with data consistency
@@ -117,24 +117,24 @@ def analyze_pdf_characteristics(pdf_content):
     """Analyze PDF to determine optimal processing strategy"""
     import PyPDF2
     from io import BytesIO
-    
+
     try:
         pdf_size_mb = len(pdf_content) / (1024 * 1024)
         pdf_reader = PyPDF2.PdfReader(BytesIO(pdf_content))
         page_count = len(pdf_reader.pages)
-        
+
         # Calculate complexity score
         complexity_factors = {
             'size_factor': min(pdf_size_mb / 5.0, 1.0),  # Normalize to 5MB max
             'page_factor': min(page_count / 10.0, 1.0),   # Normalize to 10 pages max
         }
-        
+
         # Analyze content complexity (tables, images, text density)
         content_complexity = analyze_content_complexity(pdf_reader)
         complexity_factors['content_factor'] = content_complexity
-        
+
         overall_complexity = sum(complexity_factors.values()) / len(complexity_factors)
-        
+
         return {
             'size_mb': pdf_size_mb,
             'page_count': page_count,
@@ -152,23 +152,23 @@ def analyze_pdf_characteristics(pdf_content):
 
 def determine_processing_strategy(size_mb, page_count, complexity_score):
     """Determine optimal processing strategy based on PDF characteristics"""
-    
+
     # Simple invoices: small size, few pages, low complexity
     if size_mb < 2.0 and page_count <= 3 and complexity_score < 0.4:
         return 'gemini_standard'
-    
+
     # Medium invoices: moderate size/complexity
     elif size_mb < 5.0 and page_count <= 5 and complexity_score < 0.7:
         return 'gemini_with_monitoring'
-    
+
     # Large invoices: require chunking
     elif size_mb >= 5.0 or page_count > 5:
         return 'gemini_chunked'
-    
+
     # Complex invoices: high complexity score regardless of size
     elif complexity_score >= 0.7:
         return 'document_ai'
-    
+
     else:
         return 'gemini_with_monitoring'
 ```
@@ -224,19 +224,19 @@ from contextlib import contextmanager
 @contextmanager
 def timeout_context(seconds):
     """Context manager for timeout handling with fast-fail capability"""
-    
+
     timeout_occurred = threading.Event()
     result_container = {'result': None, 'exception': None}
-    
+
     def timeout_handler():
         time.sleep(seconds)
         if not timeout_occurred.is_set():
             timeout_occurred.set()
             print(f"⚠️ Operation timed out after {seconds} seconds")
-    
+
     timeout_thread = threading.Thread(target=timeout_handler, daemon=True)
     timeout_thread.start()
-    
+
     try:
         yield timeout_occurred, result_container
     finally:
@@ -244,9 +244,9 @@ def timeout_context(seconds):
 
 def process_with_gemini_enhanced_timeout(pdf_content, analysis_result):
     """Enhanced Gemini processing with sophisticated timeout management"""
-    
+
     processing_start_time = time.time()
-    
+
     # Determine timeout based on PDF characteristics
     if analysis_result['recommended_strategy'] == 'gemini_standard':
         timeout_seconds = 20  # Fast timeout for simple invoices
@@ -254,41 +254,41 @@ def process_with_gemini_enhanced_timeout(pdf_content, analysis_result):
         timeout_seconds = 30  # Standard timeout
     else:
         timeout_seconds = 35  # Slightly longer for chunked processing
-    
+
     print(f"🤖 Starting Gemini processing with {timeout_seconds}s timeout for {analysis_result['recommended_strategy']} strategy")
-    
+
     try:
         with timeout_context(timeout_seconds) as (timeout_event, result_container):
-            
+
             # Configure Gemini with optimal settings
             api_key = get_secret_manager_secret("gemini-api-key")
             genai.configure(api_key=api_key)
-            
+
             # Use Gemini 2.5 Flash for reduced latency (as specified in PRD)
-            model = genai.GenerativeModel("gemini-1.5-flash")  
-            
+            model = genai.GenerativeModel("gemini-1.5-flash")
+
             # Execute processing with timeout monitoring
             if timeout_event.is_set():
                 print(f"⚠️ Timeout detected before processing started")
                 return None
-            
+
             # Process based on strategy
             if analysis_result['recommended_strategy'] == 'gemini_chunked':
                 result = process_gemini_with_chunking(pdf_content, model, timeout_event)
             else:
                 result = process_gemini_standard(pdf_content, model, timeout_event)
-            
+
             processing_time = time.time() - processing_start_time
-            
+
             if timeout_event.is_set():
                 print(f"⚠️ Gemini processing timed out after {processing_time:.1f}s")
                 log_timeout_metrics(analysis_result, processing_time, 'timeout')
                 return None
-            
+
             print(f"✅ Gemini processing completed in {processing_time:.1f}s")
             log_timeout_metrics(analysis_result, processing_time, 'success')
             return result
-            
+
     except Exception as e:
         processing_time = time.time() - processing_start_time
         print(f"❌ Gemini processing failed after {processing_time:.1f}s: {e}")
@@ -297,7 +297,7 @@ def process_with_gemini_enhanced_timeout(pdf_content, analysis_result):
 
 def log_timeout_metrics(analysis_result, processing_time, outcome):
     """Log detailed timeout and performance metrics for analysis"""
-    
+
     metrics = {
         'timestamp': time.time(),
         'pdf_size_mb': analysis_result['size_mb'],
@@ -307,7 +307,7 @@ def log_timeout_metrics(analysis_result, processing_time, outcome):
         'processing_time_seconds': processing_time,
         'outcome': outcome  # 'success', 'timeout', 'error'
     }
-    
+
     # Log to Cloud Functions logs for monitoring
     print(f"📊 TIMEOUT_METRICS: {metrics}")
 ```
@@ -346,119 +346,119 @@ python test_scripts/test_chunking_edge_cases.py
 ```python
 def process_gemini_with_chunking(pdf_content, model, timeout_event):
     """Process large PDFs using intelligent chunking strategy"""
-    
+
     try:
         # Split PDF into logical chunks
         chunks = create_intelligent_pdf_chunks(pdf_content)
-        
+
         if len(chunks) == 1:
             # Single chunk - process normally
             return process_single_gemini_chunk(chunks[0], model, timeout_event)
-        
+
         print(f"📄 Processing {len(chunks)} PDF chunks")
-        
+
         chunk_results = []
         for i, chunk in enumerate(chunks):
-            
+
             if timeout_event.is_set():
                 print(f"⚠️ Timeout detected during chunk {i+1} processing")
                 return None
-            
+
             print(f"🔍 Processing chunk {i+1}/{len(chunks)}")
-            
+
             # Process each chunk with reduced timeout
             chunk_timeout = 15  # Shorter timeout per chunk
             chunk_result = process_single_gemini_chunk(chunk, model, timeout_event, chunk_timeout)
-            
+
             if chunk_result is None:
                 print(f"⚠️ Chunk {i+1} failed, aborting chunked processing")
                 return None
-            
+
             chunk_results.append(chunk_result)
-        
+
         # Combine results from all chunks
         combined_result = combine_chunk_results(chunk_results)
         return combined_result
-        
+
     except Exception as e:
         print(f"❌ PDF chunking failed: {e}")
         return None
 
 def create_intelligent_pdf_chunks(pdf_content, max_chunk_size_mb=3.0):
     """Create intelligent PDF chunks that preserve invoice context"""
-    
+
     import PyPDF2
     from io import BytesIO
     import io
-    
+
     try:
         pdf_reader = PyPDF2.PdfReader(BytesIO(pdf_content))
         total_pages = len(pdf_reader.pages)
-        
+
         if total_pages <= 3:
             # Small PDFs don't need chunking
             return [pdf_content]
-        
+
         # Strategy 1: Page-based chunking for large invoices
         chunks = []
         current_chunk_pages = []
         current_chunk_size = 0
-        
+
         max_chunk_size_bytes = max_chunk_size_mb * 1024 * 1024
-        
+
         for page_num, page in enumerate(pdf_reader.pages):
             # Estimate page size (rough approximation)
             page_content = page.extract_text()
             estimated_page_size = len(page_content.encode('utf-8')) * 2  # Rough PDF overhead
-            
+
             # Check if adding this page would exceed chunk size
             if current_chunk_size + estimated_page_size > max_chunk_size_bytes and current_chunk_pages:
                 # Create chunk from current pages
                 chunk_pdf = create_pdf_from_pages(pdf_reader, current_chunk_pages)
                 chunks.append(chunk_pdf)
-                
+
                 # Start new chunk
                 current_chunk_pages = [page_num]
                 current_chunk_size = estimated_page_size
             else:
                 current_chunk_pages.append(page_num)
                 current_chunk_size += estimated_page_size
-        
+
         # Add final chunk
         if current_chunk_pages:
             chunk_pdf = create_pdf_from_pages(pdf_reader, current_chunk_pages)
             chunks.append(chunk_pdf)
-        
+
         print(f"📊 Created {len(chunks)} chunks from {total_pages} pages")
         return chunks
-        
+
     except Exception as e:
         print(f"⚠️ Chunking failed, returning original PDF: {e}")
         return [pdf_content]
 
 def create_pdf_from_pages(pdf_reader, page_numbers):
     """Create a new PDF from specified page numbers"""
-    
+
     import PyPDF2
     from io import BytesIO
-    
+
     pdf_writer = PyPDF2.PdfWriter()
-    
+
     for page_num in page_numbers:
         pdf_writer.add_page(pdf_reader.pages[page_num])
-    
+
     chunk_buffer = BytesIO()
     pdf_writer.write(chunk_buffer)
     chunk_buffer.seek(0)
-    
+
     return chunk_buffer.getvalue()
 
 def combine_chunk_results(chunk_results):
     """Combine results from multiple PDF chunks into unified output"""
-    
+
     if not chunk_results:
         return None
-    
+
     # Use first chunk for metadata (date, vendor, invoice number)
     combined_result = {
         'order_date': chunk_results[0].get('order_date', ''),
@@ -466,24 +466,24 @@ def combine_chunk_results(chunk_results):
         'invoice_number': chunk_results[0].get('invoice_number', ''),
         'line_items': []
     }
-    
+
     # Combine line items from all chunks
     for chunk_result in chunk_results:
         if 'line_items' in chunk_result:
             combined_result['line_items'].extend(chunk_result['line_items'])
-    
+
     # Deduplicate line items based on item description
     seen_items = set()
     unique_line_items = []
-    
+
     for item in combined_result['line_items']:
         item_key = item.get('item', '').strip()
         if item_key and item_key not in seen_items:
             seen_items.add(item_key)
             unique_line_items.append(item)
-    
+
     combined_result['line_items'] = unique_line_items
-    
+
     print(f"📊 Combined {len(chunk_results)} chunks into {len(unique_line_items)} unique line items")
     return combined_result
 ```
@@ -504,7 +504,7 @@ def combine_chunk_results(chunk_results):
 #### Implementation Steps
 
 ```bash
-# Step 1: Implement performance monitoring infrastructure  
+# Step 1: Implement performance monitoring infrastructure
 python test_scripts/test_performance_monitoring.py
 
 # Step 2: Test timeout prediction algorithms
@@ -522,15 +522,15 @@ python test_scripts/generate_monitoring_dashboard_data.py
 ```python
 class ProcessingMetrics:
     """Centralized processing metrics collection and analysis"""
-    
+
     def __init__(self):
         self.metrics_history = []
         self.performance_baselines = {}
-    
-    def record_processing_attempt(self, pdf_characteristics, processing_strategy, 
+
+    def record_processing_attempt(self, pdf_characteristics, processing_strategy,
                                  processing_time, outcome, error_details=None):
         """Record detailed processing metrics for analysis"""
-        
+
         metric_record = {
             'timestamp': time.time(),
             'pdf_size_mb': pdf_characteristics['size_mb'],
@@ -542,37 +542,37 @@ class ProcessingMetrics:
             'error_details': error_details,
             'memory_usage_mb': self.get_current_memory_usage()
         }
-        
+
         self.metrics_history.append(metric_record)
-        
+
         # Log for Cloud Functions monitoring
         print(f"📊 PROCESSING_METRICS: {metric_record}")
-        
+
         # Update performance baselines
         self.update_performance_baselines(metric_record)
-    
+
     def predict_timeout_risk(self, pdf_characteristics):
         """Predict likelihood of timeout based on historical data"""
-        
+
         similar_cases = self.find_similar_processing_cases(pdf_characteristics)
-        
+
         if len(similar_cases) < 5:
             return 'unknown'  # Not enough data
-        
+
         timeout_rate = len([case for case in similar_cases if case['outcome'] == 'timeout']) / len(similar_cases)
-        
+
         if timeout_rate > 0.3:
             return 'high'
         elif timeout_rate > 0.1:
             return 'medium'
         else:
             return 'low'
-    
+
     def get_recommended_timeout(self, pdf_characteristics, processing_strategy):
         """Get recommended timeout based on historical performance"""
-        
+
         similar_cases = self.find_similar_processing_cases(pdf_characteristics, processing_strategy)
-        
+
         if not similar_cases:
             # Default timeouts by strategy
             defaults = {
@@ -581,32 +581,32 @@ class ProcessingMetrics:
                 'gemini_chunked': 35
             }
             return defaults.get(processing_strategy, 30)
-        
+
         # Use 95th percentile of successful processing times
-        successful_times = [case['processing_time_seconds'] for case in similar_cases 
+        successful_times = [case['processing_time_seconds'] for case in similar_cases
                           if case['outcome'] == 'success']
-        
+
         if successful_times:
             return min(int(sorted(successful_times)[int(len(successful_times) * 0.95)]) + 5, 45)
         else:
             return 30  # Safe fallback
-    
+
     def find_similar_processing_cases(self, pdf_characteristics, processing_strategy=None):
         """Find similar historical processing cases for comparison"""
-        
+
         similar_cases = []
         size_tolerance = 1.0  # MB
         complexity_tolerance = 0.2
-        
+
         for record in self.metrics_history:
             size_diff = abs(record['pdf_size_mb'] - pdf_characteristics['size_mb'])
             complexity_diff = abs(record['complexity_score'] - pdf_characteristics['complexity_score'])
-            
-            if (size_diff <= size_tolerance and 
+
+            if (size_diff <= size_tolerance and
                 complexity_diff <= complexity_tolerance and
                 (processing_strategy is None or record['processing_strategy'] == processing_strategy)):
                 similar_cases.append(record)
-        
+
         return similar_cases[-50:]  # Most recent 50 similar cases
 
 # Global metrics instance
@@ -614,35 +614,35 @@ processing_metrics = ProcessingMetrics()
 
 def enhanced_process_with_gemini_monitoring(pdf_content):
     """Main Gemini processing function with comprehensive monitoring"""
-    
+
     processing_start_time = time.time()
-    
+
     try:
         # Step 1: Analyze PDF characteristics
         pdf_analysis = analyze_pdf_characteristics(pdf_content)
-        
+
         # Step 2: Predict timeout risk and adjust strategy
         timeout_risk = processing_metrics.predict_timeout_risk(pdf_analysis)
-        
+
         if timeout_risk == 'high':
             print(f"⚠️ High timeout risk detected, routing to Document AI")
             processing_metrics.record_processing_attempt(
                 pdf_analysis, 'document_ai_preemptive', 0, 'preemptive_fallback'
             )
             return None
-        
+
         # Step 3: Get recommended timeout
         recommended_timeout = processing_metrics.get_recommended_timeout(
             pdf_analysis, pdf_analysis['recommended_strategy']
         )
-        
+
         print(f"🎯 Recommended timeout: {recommended_timeout}s for {pdf_analysis['recommended_strategy']} strategy")
-        
+
         # Step 4: Process with enhanced timeout management
         result = process_with_gemini_enhanced_timeout(pdf_analysis, recommended_timeout)
-        
+
         processing_time = time.time() - processing_start_time
-        
+
         if result is not None:
             # Success
             processing_metrics.record_processing_attempt(
@@ -655,7 +655,7 @@ def enhanced_process_with_gemini_monitoring(pdf_content):
                 pdf_analysis, pdf_analysis['recommended_strategy'], processing_time, 'timeout'
             )
             return None
-            
+
     except Exception as e:
         processing_time = time.time() - processing_start_time
         processing_metrics.record_processing_attempt(

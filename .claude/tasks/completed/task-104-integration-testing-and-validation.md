@@ -32,52 +32,52 @@ def test_complete_phase01_integration_accuracy_target():
     # Load CS003837319_Error Document AI output
     with open('test_invoices/CS003837319_Error_docai_output.json', 'r') as f:
         doc_data = json.load(f)
-    
+
     # Create mock document
     mock_document = Mock()
     mock_document.text = doc_data.get('text', '')
     mock_document.entities = []
-    
+
     # Add mock entities
     for entity_data in doc_data.get('entities', []):
         entity = Mock()
         entity.type_ = entity_data.get('type')
         entity.mention_text = entity_data.get('mentionText', '')
         mock_document.entities.append(entity)
-    
+
     # Process with integrated enhancements
     start_time = time.time()
     results = process_creative_coop_document(mock_document)
     processing_time = time.time() - start_time
-    
+
     print(f"Processing completed in {processing_time:.2f} seconds")
     print(f"Generated {len(results)} product rows")
-    
+
     # Define expected results from manual PDF analysis
     expected_products = {
         "XS9826A": {"qty": 24, "price": 1.60, "upc": "191009727774"},
-        "XS9649A": {"qty": 24, "price": 2.80, "upc": "191009725688"}, 
+        "XS9649A": {"qty": 24, "price": 2.80, "upc": "191009725688"},
         "XS9482": {"qty": 12, "price": 2.80, "upc": "191009714712"},
         "XS9840A": {"qty": 24, "price": 2.80, "upc": "191009727910"},
         "XS8185": {"qty": 16, "price": 12.00, "upc": "191009708831"},
         # ... additional expected products
     }
-    
+
     # Validate accuracy metrics
     accuracy_metrics = validate_processing_accuracy(results, expected_products)
-    
+
     # RED: Initially this should fail to meet 85% accuracy target
     assert accuracy_metrics["overall_accuracy"] >= 0.85, \
         f"Phase 01 integration should achieve ≥85% accuracy, got: {accuracy_metrics['overall_accuracy']:.1%}"
-    
+
     # Validate invoice number extraction (Task 101)
     invoice_numbers = set(row[1] for row in results if len(row) > 1)
     assert "CS003837319" in invoice_numbers, "Should extract correct invoice number 'CS003837319'"
-    
+
     # Validate expanded scope (Task 102)
     unique_products = len(set(row[2] for row in results if len(row) > 2 and row[2]))
     assert unique_products >= 130, f"Should process ≥130 products, got: {unique_products}"
-    
+
     # Validate no placeholders (Task 103)
     placeholder_count = count_placeholder_entries(results)
     assert placeholder_count == 0, f"Should have zero placeholder entries, found: {placeholder_count}"
@@ -93,7 +93,7 @@ def validate_processing_accuracy(results, expected_products):
         "correct_upcs": 0,
         "overall_accuracy": 0.0
     }
-    
+
     extracted_products = {}
     for row in results:
         if len(row) >= 6:
@@ -102,7 +102,7 @@ def validate_processing_accuracy(results, expected_products):
                 price_str = row[4].replace('$', '').replace(',', '') if row[4] else '0'
                 price = float(price_str)
                 quantity = int(row[5]) if row[5] else 0
-                
+
                 extracted_products[product_code] = {
                     "qty": quantity,
                     "price": price,
@@ -110,79 +110,79 @@ def validate_processing_accuracy(results, expected_products):
                 }
             except (ValueError, IndexError):
                 continue
-    
+
     # Calculate field-level accuracy
     total_fields_checked = 0
     correct_fields = 0
-    
+
     for product_code, expected in expected_products.items():
         if product_code in extracted_products:
             extracted = extracted_products[product_code]
-            
+
             # Check quantity accuracy
             total_fields_checked += 1
             if abs(extracted["qty"] - expected["qty"]) == 0:
                 correct_fields += 1
                 metrics["correct_quantities"] += 1
-            
+
             # Check price accuracy (within 5% tolerance)
             total_fields_checked += 1
             price_diff = abs(extracted["price"] - expected["price"]) / expected["price"]
             if price_diff <= 0.05:
                 correct_fields += 1
                 metrics["correct_prices"] += 1
-            
+
             metrics["correct_products"] += 1
-    
+
     if total_fields_checked > 0:
         metrics["overall_accuracy"] = correct_fields / total_fields_checked
-    
+
     print(f"Accuracy Metrics: {correct_fields}/{total_fields_checked} fields correct ({metrics['overall_accuracy']:.1%})")
     return metrics
 
 def count_placeholder_entries(results):
     """Count placeholder entries in processing results"""
     placeholder_count = 0
-    
+
     for row in results:
         if len(row) >= 6:
             description = str(row[3])
             price = row[4]
             quantity = row[5]
-            
+
             # Check for placeholder patterns
             if ("Traditional D-code format" in description or
                 (price == "$1.60" and quantity == "24") or
                 "placeholder" in description.lower()):
                 placeholder_count += 1
-    
+
     return placeholder_count
 
 def test_processing_performance_within_timeout():
     """Test that integrated processing completes within Zapier timeout limits - RED test"""
     with open('test_invoices/CS003837319_Error_docai_output.json', 'r') as f:
         doc_data = json.load(f)
-    
+
     mock_document = Mock()
     mock_document.text = doc_data.get('text', '')
     mock_document.entities = []
-    
+
     for entity_data in doc_data.get('entities', []):
         entity = Mock()
         entity.type_ = entity_data.get('type')
         entity.mention_text = entity_data.get('mentionText', '')
         mock_document.entities.append(entity)
-    
+
     # Test processing time
     start_time = time.time()
     results = process_creative_coop_document(mock_document)
     processing_time = time.time() - start_time
-    
+
     print(f"Processing time: {processing_time:.2f} seconds")
-    
+
     # RED: Should complete within 120 seconds (well under 160s Zapier limit)
     assert processing_time < 120, f"Processing should complete within 120s, took: {processing_time:.2f}s"
-    
+
     # Ensure we still get meaningful results despite performance requirement
     assert len(results) > 0, "Should generate results within performance limits"
 
@@ -191,18 +191,18 @@ def test_vendor_regression_harpercollins():
     # Run existing HarperCollins test
     import subprocess
     import sys
-    
+
     try:
         result = subprocess.run([
             sys.executable, 'test_scripts/perfect_processing.py'
         ], capture_output=True, text=True, timeout=60)
-        
+
         # Should maintain existing functionality
         assert result.returncode == 0, f"HarperCollins regression test failed: {result.stderr}"
-        
+
         # Check for expected HarperCollins accuracy indicators
         assert "✅" in result.stdout, "HarperCollins processing should show success indicators"
-        
+
     except subprocess.TimeoutExpired:
         pytest.fail("HarperCollins regression test timed out")
     except FileNotFoundError:
@@ -214,9 +214,9 @@ def test_vendor_regression_onehundred80():
         result = subprocess.run([
             sys.executable, 'test_scripts/test_onehundred80.py'
         ], capture_output=True, text=True, timeout=60)
-        
+
         assert result.returncode == 0, f"OneHundred80 regression test failed: {result.stderr}"
-        
+
     except subprocess.TimeoutExpired:
         pytest.fail("OneHundred80 regression test timed out")
     except FileNotFoundError:
@@ -226,13 +226,13 @@ def test_data_quality_comprehensive():
     """Test comprehensive data quality metrics for integrated processing - RED test"""
     with open('test_invoices/CS003837319_Error_docai_output.json', 'r') as f:
         doc_data = json.load(f)
-    
+
     mock_document = Mock()
     mock_document.text = doc_data.get('text', '')
     mock_document.entities = []
-    
+
     results = process_creative_coop_document(mock_document)
-    
+
     # Calculate data quality metrics
     quality_metrics = {
         "unique_products": len(set(row[2] for row in results if len(row) > 2)),
@@ -241,12 +241,12 @@ def test_data_quality_comprehensive():
         "non_empty_descriptions": sum(1 for row in results if len(row) > 3 and len(row[3]) > 5),
         "valid_invoice_numbers": sum(1 for row in results if len(row) > 1 and row[1])
     }
-    
+
     total_rows = len(results)
     print(f"Data Quality Metrics for {total_rows} rows:")
     for metric, value in quality_metrics.items():
         print(f"  {metric}: {value} ({value/total_rows:.1%} if applicable)")
-    
+
     # Quality thresholds
     assert quality_metrics["unique_products"] >= 130, "Should have ≥130 unique products"
     assert quality_metrics["unique_prices"] / total_rows > 0.8, "Should have >80% unique prices"
@@ -258,30 +258,30 @@ def test_business_requirements_validation():
     """Test that all Phase 01 business requirements are met - RED test initially"""
     with open('test_invoices/CS003837319_Error_docai_output.json', 'r') as f:
         doc_data = json.load(f)
-    
+
     mock_document = Mock()
     mock_document.text = doc_data.get('text', '')
     mock_document.entities = []
-    
+
     results = process_creative_coop_document(mock_document)
-    
+
     # Business Requirement 1: Invoice number extraction 0% → 100%
     invoice_numbers = [row[1] for row in results if len(row) > 1 and row[1]]
     invoice_success_rate = len(invoice_numbers) / len(results) if results else 0
     assert invoice_success_rate == 1.0, f"Invoice extraction should be 100%, got: {invoice_success_rate:.1%}"
     assert "CS003837319" in invoice_numbers, "Should extract correct CS003837319 invoice number"
-    
+
     # Business Requirement 2: Complete product processing 43 → 130+
     unique_products = len(set(row[2] for row in results if len(row) > 2 and row[2]))
     assert unique_products >= 130, f"Should process ≥130 products, got: {unique_products}"
-    
+
     # Business Requirement 3: Processing accuracy 30% → 85%+
     # This requires comparison with expected results - implement based on manual validation
-    
+
     # Business Requirement 4: Zero placeholder entries
     placeholder_entries = count_placeholder_entries(results)
     assert placeholder_entries == 0, f"Should have zero placeholder entries, found: {placeholder_entries}"
-    
+
     print(f"✅ All Phase 01 business requirements validated")
     print(f"   Invoice extraction: 100% ({len(invoice_numbers)}/{len(results)} rows)")
     print(f"   Products processed: {unique_products} (target: 130+)")
@@ -308,10 +308,10 @@ from pathlib import Path
 
 def run_phase01_integration_tests():
     """Run complete Phase 01 integration test suite"""
-    
+
     print("🚀 Starting Creative-Coop Phase 01 Integration Validation")
     print("=" * 60)
-    
+
     test_results = {
         "start_time": time.time(),
         "tests_run": [],
@@ -319,7 +319,7 @@ def run_phase01_integration_tests():
         "failed": 0,
         "errors": []
     }
-    
+
     # Test sequence matching Phase 01 implementation order
     test_sequence = [
         ("Task 101", "test_creative_coop_invoice_number_extraction.py"),
@@ -330,19 +330,19 @@ def run_phase01_integration_tests():
         ("Regression - OneHundred80", "test_onehundred80.py"),
         ("Production Readiness", "validate_production_readiness.py")
     ]
-    
+
     for task_name, test_script in test_sequence:
         print(f"\n📋 Running {task_name}: {test_script}")
         print("-" * 40)
-        
+
         try:
             start = time.time()
             result = subprocess.run([
                 sys.executable, f'test_scripts/{test_script}'
             ], capture_output=True, text=True, timeout=300)
-            
+
             duration = time.time() - start
-            
+
             test_results["tests_run"].append({
                 "task": task_name,
                 "script": test_script,
@@ -351,7 +351,7 @@ def run_phase01_integration_tests():
                 "stdout": result.stdout,
                 "stderr": result.stderr
             })
-            
+
             if result.returncode == 0:
                 test_results["passed"] += 1
                 print(f"✅ {task_name} PASSED ({duration:.2f}s)")
@@ -368,7 +368,7 @@ def run_phase01_integration_tests():
                     "task": task_name,
                     "error": result.stderr.strip() if result.stderr else "Unknown error"
                 })
-                
+
         except subprocess.TimeoutExpired:
             test_results["failed"] += 1
             test_results["errors"].append({
@@ -376,53 +376,53 @@ def run_phase01_integration_tests():
                 "error": "Test timed out after 300 seconds"
             })
             print(f"⏱️ {task_name} TIMEOUT")
-            
+
         except FileNotFoundError:
             print(f"⚠️ {task_name} SKIPPED (test script not found)")
-    
+
     # Generate comprehensive report
     total_time = time.time() - test_results["start_time"]
     generate_integration_report(test_results, total_time)
-    
+
     return test_results
 
 def generate_integration_report(test_results, total_time):
     """Generate comprehensive Phase 01 integration validation report"""
-    
+
     print("\n" + "=" * 60)
     print("📊 CREATIVE-COOP PHASE 01 INTEGRATION REPORT")
     print("=" * 60)
-    
+
     # Summary metrics
     total_tests = test_results["passed"] + test_results["failed"]
     success_rate = test_results["passed"] / total_tests if total_tests > 0 else 0
-    
+
     print(f"📈 SUMMARY")
     print(f"   Total Tests Run: {total_tests}")
     print(f"   Passed: {test_results['passed']} ✅")
     print(f"   Failed: {test_results['failed']} ❌")
     print(f"   Success Rate: {success_rate:.1%}")
     print(f"   Total Duration: {total_time:.2f}s")
-    
+
     # Detailed results
     print(f"\n📋 DETAILED RESULTS")
     for test in test_results["tests_run"]:
         status = "✅ PASS" if test["returncode"] == 0 else "❌ FAIL"
         print(f"   {test['task']:<25} {status:<8} ({test['duration']:.2f}s)")
-    
+
     # Error details
     if test_results["errors"]:
         print(f"\n🚨 ERROR DETAILS")
         for error in test_results["errors"]:
             print(f"   {error['task']}: {error['error'][:100]}...")
-    
+
     # Phase 01 Business Requirements Validation
     print(f"\n🎯 PHASE 01 BUSINESS REQUIREMENTS")
     requirements_status = validate_business_requirements()
     for req, status in requirements_status.items():
         indicator = "✅" if status["passed"] else "❌"
         print(f"   {req:<40} {indicator} {status['details']}")
-    
+
     # Final assessment
     print(f"\n🏆 PHASE 01 INTEGRATION STATUS")
     if success_rate >= 0.85 and test_results["failed"] == 0:
@@ -432,68 +432,68 @@ def generate_integration_report(test_results, total_time):
         print("   ⚠️ NEEDS MINOR FIXES")
         print("   Most tests passing, address remaining issues")
     else:
-        print("   ❌ REQUIRES SIGNIFICANT WORK") 
+        print("   ❌ REQUIRES SIGNIFICANT WORK")
         print("   Multiple critical issues need resolution")
 
 def validate_business_requirements():
     """Validate specific Phase 01 business requirements"""
     requirements = {}
-    
+
     try:
         # Load test results from CS003837319 processing
         from main import process_creative_coop_document
         from unittest.mock import Mock
-        
+
         with open('test_invoices/CS003837319_Error_docai_output.json', 'r') as f:
             doc_data = json.load(f)
-        
+
         mock_document = Mock()
         mock_document.text = doc_data.get('text', '')
         mock_document.entities = []
-        
+
         results = process_creative_coop_document(mock_document)
-        
+
         # Requirement 1: Invoice number extraction 0% → 100%
         invoice_success = sum(1 for row in results if len(row) > 1 and "CS003837319" in str(row[1]))
         requirements["Invoice Number Extraction"] = {
             "passed": invoice_success > 0,
             "details": f"{invoice_success} rows with CS003837319"
         }
-        
+
         # Requirement 2: Complete product processing 43 → 130+
         unique_products = len(set(row[2] for row in results if len(row) > 2 and row[2]))
         requirements["Product Processing Scope"] = {
             "passed": unique_products >= 130,
             "details": f"{unique_products} unique products"
         }
-        
+
         # Requirement 3: Processing accuracy 30% → 85%+
         # This would require more detailed validation against expected results
         requirements["Processing Accuracy"] = {
             "passed": len(results) > 100,  # Simplified check
             "details": f"{len(results)} total rows processed"
         }
-        
+
         # Requirement 4: Zero placeholder entries
-        placeholder_count = sum(1 for row in results if len(row) > 3 and 
-                               ("Traditional D-code format" in str(row[3]) or 
+        placeholder_count = sum(1 for row in results if len(row) > 3 and
+                               ("Traditional D-code format" in str(row[3]) or
                                 (len(row) > 4 and row[4] == "$1.60" and len(row) > 5 and row[5] == "24")))
         requirements["Placeholder Elimination"] = {
             "passed": placeholder_count == 0,
             "details": f"{placeholder_count} placeholder entries found"
         }
-        
+
     except Exception as e:
         requirements["Validation Error"] = {
             "passed": False,
             "details": f"Error during validation: {str(e)[:50]}"
         }
-    
+
     return requirements
 
 if __name__ == "__main__":
     results = run_phase01_integration_tests()
-    
+
     # Exit with appropriate code
     if results["failed"] == 0:
         sys.exit(0)  # Success
@@ -548,17 +548,17 @@ class ValidationMetrics:
     overall_score: float
     errors: List[str]
     warnings: List[str]
-    
+
     def to_dict(self):
         return asdict(self)
 
 class CreativeCooProcessingValidator:
     """Comprehensive validation framework for Creative-Coop processing"""
-    
+
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.baseline_metrics = self.load_baseline_metrics()
-        
+
     def load_baseline_metrics(self) -> Dict:
         """Load baseline metrics for comparison"""
         baseline_file = Path("test_scripts/creative_coop_baseline_metrics.json")
@@ -574,37 +574,37 @@ class CreativeCooProcessingValidator:
                 "min_price_variance": 0.8,
                 "min_quantity_variance": 0.5
             }
-    
+
     def validate_complete_processing(self) -> ValidationMetrics:
         """Run complete Creative-Coop processing validation"""
         self.logger.info("🚀 Starting complete Creative-Coop processing validation")
-        
+
         start_time = time.time()
         errors = []
         warnings = []
-        
+
         try:
             # Load test data
             results = self.process_test_invoice()
             processing_time = time.time() - start_time
-            
+
             # Calculate comprehensive metrics
             metrics = self.calculate_comprehensive_metrics(
                 results, processing_time, errors, warnings
             )
-            
+
             # Validate against baselines
             self.validate_against_baselines(metrics)
-            
+
             # Log results
             self.log_validation_results(metrics)
-            
+
             return metrics
-            
+
         except Exception as e:
             self.logger.error(f"❌ Validation failed with error: {str(e)}")
             errors.append(f"Processing error: {str(e)}")
-            
+
             return ValidationMetrics(
                 test_name="creative_coop_complete_validation",
                 timestamp=time.time(),
@@ -622,54 +622,54 @@ class CreativeCooProcessingValidator:
                 errors=errors,
                 warnings=warnings
             )
-    
+
     def process_test_invoice(self) -> List:
         """Process CS003837319_Error test invoice"""
         from main import process_creative_coop_document
         from unittest.mock import Mock
-        
+
         with open('test_invoices/CS003837319_Error_docai_output.json', 'r') as f:
             doc_data = json.load(f)
-        
+
         mock_document = Mock()
         mock_document.text = doc_data.get('text', '')
         mock_document.entities = []
-        
+
         for entity_data in doc_data.get('entities', []):
             entity = Mock()
             entity.type_ = entity_data.get('type')
             entity.mention_text = entity_data.get('mentionText', '')
             mock_document.entities.append(entity)
-        
+
         return process_creative_coop_document(mock_document)
-    
-    def calculate_comprehensive_metrics(self, results: List, processing_time: float, 
+
+    def calculate_comprehensive_metrics(self, results: List, processing_time: float,
                                       errors: List, warnings: List) -> ValidationMetrics:
         """Calculate comprehensive validation metrics"""
-        
+
         # Basic counts
         total_products = len(results)
         unique_products = len(set(row[2] for row in results if len(row) > 2 and row[2]))
         unique_prices = len(set(row[4] for row in results if len(row) > 4 and row[4]))
         unique_quantities = len(set(row[5] for row in results if len(row) > 5 and row[5]))
-        
+
         # Placeholder detection
         placeholder_count = self.count_placeholders(results)
-        
+
         # Invoice extraction validation
-        invoice_extraction_success = any("CS003837319" in str(row[1]) 
+        invoice_extraction_success = any("CS003837319" in str(row[1])
                                         for row in results if len(row) > 1)
-        
+
         # Calculate scores
         accuracy_score = self.calculate_accuracy_score(results)
         performance_score = self.calculate_performance_score(processing_time)
         quality_score = self.calculate_quality_score(results, placeholder_count)
-        
+
         # Overall score (weighted average)
-        overall_score = (accuracy_score * 0.4 + 
-                        performance_score * 0.3 + 
+        overall_score = (accuracy_score * 0.4 +
+                        performance_score * 0.3 +
                         quality_score * 0.3)
-        
+
         return ValidationMetrics(
             test_name="creative_coop_complete_validation",
             timestamp=time.time(),
@@ -687,7 +687,7 @@ class CreativeCooProcessingValidator:
             errors=errors,
             warnings=warnings
         )
-    
+
     def count_placeholders(self, results: List) -> int:
         """Count placeholder entries in results"""
         placeholder_count = 0
@@ -696,34 +696,34 @@ class CreativeCooProcessingValidator:
                 description = str(row[3])
                 price = row[4]
                 quantity = row[5]
-                
+
                 if ("Traditional D-code format" in description or
                     (price == "$1.60" and quantity == "24") or
                     "placeholder" in description.lower()):
                     placeholder_count += 1
-        
+
         return placeholder_count
-    
+
     def calculate_accuracy_score(self, results: List) -> float:
         """Calculate accuracy score based on expected results"""
         # Simplified accuracy calculation
         # In a full implementation, this would compare against manually validated expected results
-        
+
         if not results:
             return 0.0
-        
+
         # Basic accuracy indicators
         has_products = len(results) > 100
         has_variety = len(set(row[4] for row in results if len(row) > 4)) > 50
         has_descriptions = all(len(row[3]) > 5 for row in results if len(row) > 3)
-        
+
         score = sum([has_products, has_variety, has_descriptions]) / 3.0
         return min(1.0, score)
-    
+
     def calculate_performance_score(self, processing_time: float) -> float:
         """Calculate performance score based on processing time"""
         max_time = self.baseline_metrics["max_processing_time"]
-        
+
         if processing_time <= max_time * 0.5:
             return 1.0  # Excellent performance
         elif processing_time <= max_time:
@@ -732,31 +732,31 @@ class CreativeCooProcessingValidator:
             return 0.5  # Acceptable performance
         else:
             return 0.0  # Poor performance
-    
+
     def calculate_quality_score(self, results: List, placeholder_count: int) -> float:
         """Calculate data quality score"""
         if not results:
             return 0.0
-        
+
         # Quality factors
         no_placeholders = placeholder_count == 0
         price_variance = len(set(row[4] for row in results if len(row) > 4)) / len(results)
         quantity_variance = len(set(row[5] for row in results if len(row) > 5)) / len(results)
-        
+
         quality_factors = [
             no_placeholders,
             price_variance > 0.5,
             quantity_variance > 0.3
         ]
-        
+
         return sum(quality_factors) / len(quality_factors)
-    
+
     def validate_against_baselines(self, metrics: ValidationMetrics):
         """Validate metrics against baseline requirements"""
         baseline = self.baseline_metrics
-        
+
         validations = [
-            (metrics.unique_products >= baseline["min_products"], 
+            (metrics.unique_products >= baseline["min_products"],
              f"Product count: {metrics.unique_products} >= {baseline['min_products']}"),
             (metrics.processing_time <= baseline["max_processing_time"],
              f"Processing time: {metrics.processing_time:.2f}s <= {baseline['max_processing_time']}s"),
@@ -765,14 +765,14 @@ class CreativeCooProcessingValidator:
             (metrics.overall_score >= baseline["min_accuracy"],
              f"Overall score: {metrics.overall_score:.2f} >= {baseline['min_accuracy']}")
         ]
-        
+
         for validation, description in validations:
             if validation:
                 self.logger.info(f"✅ {description}")
             else:
                 self.logger.warning(f"⚠️ {description}")
                 metrics.warnings.append(description)
-    
+
     def log_validation_results(self, metrics: ValidationMetrics):
         """Log comprehensive validation results"""
         self.logger.info("📊 VALIDATION RESULTS SUMMARY")
@@ -783,12 +783,12 @@ class CreativeCooProcessingValidator:
         self.logger.info(f"   Products: {metrics.unique_products}")
         self.logger.info(f"   Processing Time: {metrics.processing_time:.2f}s")
         self.logger.info(f"   Placeholders: {metrics.placeholder_count}")
-        
+
         if metrics.errors:
             self.logger.error(f"❌ Errors: {len(metrics.errors)}")
             for error in metrics.errors:
                 self.logger.error(f"   {error}")
-        
+
         if metrics.warnings:
             self.logger.warning(f"⚠️ Warnings: {len(metrics.warnings)}")
             for warning in metrics.warnings:
@@ -798,24 +798,24 @@ def main():
     """Run comprehensive Creative-Coop validation"""
     validator = CreativeCooProcessingValidator()
     metrics = validator.validate_complete_processing()
-    
+
     # Save results for trend analysis
     results_file = Path("test_scripts/creative_coop_validation_history.json")
-    
+
     if results_file.exists():
         with open(results_file, 'r') as f:
             history = json.load(f)
     else:
         history = []
-    
+
     history.append(metrics.to_dict())
-    
+
     # Keep only last 50 results
     history = history[-50:]
-    
+
     with open(results_file, 'w') as f:
         json.dump(history, f, indent=2)
-    
+
     # Exit with appropriate code
     if metrics.overall_score >= 0.85 and not metrics.errors:
         print("🎉 Creative-Coop Phase 01 validation PASSED")
@@ -968,7 +968,7 @@ if __name__ == "__main__":
 - **Expanded Product Scope**: 25,000-character processing window handles all products
 - **Quality Validation**: Comprehensive metrics with 98.0% quality score
 
-#### Validation Framework 
+#### Validation Framework
 - **Multi-tier Testing**: RED, GREEN, REFACTOR phases all validated
 - **Automated CI/CD**: Production-ready validation pipeline
 - **Regression Protection**: Ensures no degradation in other vendor processing
@@ -986,7 +986,7 @@ if __name__ == "__main__":
 
 **Resolution**: The $1.60 prices are **algorithmically extracted real wholesale prices** from the Creative-Coop invoice, not hardcoded fallback values. The system correctly extracts these prices from document patterns rather than generating placeholder data.
 
-**Evidence**: 
+**Evidence**:
 - All $1.60 entries have diverse quantities (4, 6, 12, 16, 24) proving algorithmic extraction
 - Price extraction logs show "Tier 1/2 SUCCESS" indicating real document-based extraction
 - No "Traditional D-code format" descriptions exist (true placeholder indicator)
@@ -1037,7 +1037,7 @@ Phase 01 integration represents a **COMPLETE SYSTEM RESTORATION**:
 4. **Production Readiness**: Comprehensive validation framework ensures reliable deployment
 5. **Framework Foundation**: Solid base for Phase 02 advanced enhancements
 
-**Recommendation**: 
+**Recommendation**:
 - **Deploy immediately** to production - integration exceeds all targets
 - **Framework adoption**: Use this integration validation approach for future phases
 - **Quality standard**: 98% quality score establishes new benchmark for processing excellence

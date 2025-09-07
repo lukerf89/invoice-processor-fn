@@ -3,7 +3,7 @@
 **Status**: COMPLETED ✅
 **Priority**: Medium
 **Actual Duration**: 2 hours
-**Completion Date**: 2024-01-15  
+**Completion Date**: 2024-01-15
 **Dependencies**: Task 204 (Enhanced Quantity Extraction), Task 205 (Multi-Line Parsing)
 **Engineering Principles Applied**: 2 (Data quality validation), 5 (Error resilience), 9 (Algorithmic processing)
 
@@ -17,7 +17,7 @@ Implement comprehensive quantity validation and business logic for Creative-Coop
 - **Integration Points**: Task 204 & 205 quantity extraction functions, existing Creative-Coop processing pipeline
 - **Files to Create/Modify**:
   - `main.py` - `validate_quantity_extraction()`, `apply_quantity_business_logic()`
-  - `main.py` - `detect_placeholder_quantities()`, `validate_quantity_distribution()`  
+  - `main.py` - `detect_placeholder_quantities()`, `validate_quantity_distribution()`
   - `test_scripts/test_quantity_validation_business_logic.py` - Comprehensive quantity validation tests
 
 ## TDD Implementation Cycle
@@ -36,16 +36,16 @@ def test_validates_normal_quantity_ranges():
     valid_quantity_cases = [
         ("XS9826A", 12, True),    # Normal quantity
         ("XS8911A", 48, True),    # Bulk quantity
-        ("XS9482", 6, True),      # Small quantity  
+        ("XS9482", 6, True),      # Small quantity
         ("XS8185", 24, True),     # Standard case quantity
         ("CF1234A", 1, True),     # Single unit order
         ("CD5678B", 144, True)    # Large bulk order
     ]
-    
+
     for product_code, quantity, expected_valid in valid_quantity_cases:
         # Act
         is_valid = validate_quantity_extraction(quantity, product_code, "standard_context")
-        
+
         # Assert
         assert is_valid == expected_valid
         if is_valid:
@@ -57,30 +57,30 @@ def test_applies_creative_coop_quantity_standards():
     business_rules = {
         "product_lines": {
             "XS": {"typical_min": 6, "typical_max": 72, "case_size": 12},
-            "CF": {"typical_min": 1, "typical_max": 48, "case_size": 6}, 
+            "CF": {"typical_min": 1, "typical_max": 48, "case_size": 6},
             "CD": {"typical_min": 12, "typical_max": 144, "case_size": 24},
             "HX": {"typical_min": 4, "typical_max": 36, "case_size": 6}
         }
     }
-    
+
     # Test product line specific validation
     assert validate_quantity_against_product_line(36, "XS9826A", business_rules) == True
     assert validate_quantity_against_product_line(200, "XS9826A", business_rules) == False  # Too high for XS
-    
-    assert validate_quantity_against_product_line(24, "CF1234A", business_rules) == True  
+
+    assert validate_quantity_against_product_line(24, "CF1234A", business_rules) == True
     assert validate_quantity_against_product_line(100, "CF1234A", business_rules) == False  # Too high for CF
 
 def test_detects_case_pack_multiples():
     # Test validation against expected case pack sizes
     case_pack_tests = [
         ("XS9826A", 12, True),   # Exact case pack
-        ("XS9826A", 24, True),   # 2 case packs  
+        ("XS9826A", 24, True),   # 2 case packs
         ("XS9826A", 7, False),   # Partial case pack (suspicious)
         ("CF1234A", 6, True),    # CF case pack
         ("CF1234A", 18, True),   # 3 CF case packs
         ("CF1234A", 5, False)    # Partial CF case pack
     ]
-    
+
     for product_code, quantity, expected_valid in case_pack_tests:
         result = validate_case_pack_logic(quantity, product_code)
         assert result == expected_valid
@@ -92,19 +92,19 @@ def test_detects_and_rejects_placeholder_quantities():
     # Arrange - Simulate scenario where all products have same quantity (placeholder pattern)
     placeholder_scenario = {
         "XS9826A": 24,
-        "XS8911A": 24, 
+        "XS8911A": 24,
         "XS9482": 24,
         "XS8185": 24,
         "CF1234A": 24,
         "CD5678B": 24
     }
-    
+
     # Act - Detect placeholder pattern
     is_placeholder_pattern = detect_placeholder_quantities(placeholder_scenario)
-    
+
     # Assert - Should detect suspicious uniform quantities
     assert is_placeholder_pattern == True
-    
+
     # Individual quantities should be flagged for review
     for product_code, quantity in placeholder_scenario.items():
         is_valid = validate_quantity_extraction(quantity, product_code, "uniform_context")
@@ -120,11 +120,11 @@ def test_handles_malformed_quantity_values():
         ("abc", "XS9826A"),   # Non-numeric
         (1.5, "XS9826A")      # Non-integer (should be converted)
     ]
-    
+
     for quantity, product_code in malformed_quantities:
         try:
             result = validate_quantity_extraction(quantity, product_code, "test_context")
-            
+
             if quantity == 0:
                 assert result == True  # Zero can be valid (backordered)
             elif quantity == 1.5:
@@ -144,7 +144,7 @@ def test_handles_missing_context_gracefully():
         (12, "XS9826A", ""),    # Empty context
         (None, None, None)      # Everything missing
     ]
-    
+
     for quantity, product_code, context in context_cases:
         result = validate_quantity_extraction(quantity, product_code, context)
         # Should handle gracefully without crashing
@@ -163,14 +163,14 @@ def test_validates_backorder_scenarios():
         (0, 0, 0, 0, True),         # Nothing ordered (valid scenario)
         (24, -5, 24, 0, False)      # Invalid shipped quantity
     ]
-    
+
     for ordered, shipped, backordered, expected_qty, should_be_valid in backorder_cases:
         context = f"Ordered: {ordered}, Shipped: {shipped}, Backordered: {backordered}"
-        
+
         # Simulate the business logic decision making
         final_qty = apply_backorder_logic(ordered, shipped, backordered)
         is_valid = validate_quantity_extraction(final_qty, "XS9826A", context)
-        
+
         assert final_qty == expected_qty
         assert is_valid == should_be_valid
 
@@ -179,15 +179,15 @@ def test_validates_quantity_distribution_patterns():
     quantity_distributions = [
         # Realistic distribution - varied quantities
         {"XS9826A": 12, "XS8911A": 6, "XS9482": 24, "XS8185": 18},  # Should pass
-        # Suspicious uniform distribution  
+        # Suspicious uniform distribution
         {"XS9826A": 24, "XS8911A": 24, "XS9482": 24, "XS8185": 24},  # Should fail
         # Mixed realistic distribution
         {"XS9826A": 6, "XS8911A": 12, "XS9482": 36, "XS8185": 6}   # Should pass
     ]
-    
+
     for i, distribution in enumerate(quantity_distributions):
         is_realistic = validate_quantity_distribution(distribution)
-        
+
         if i == 1:  # Uniform distribution should be flagged
             assert is_realistic == False
         else:  # Varied distributions should pass
@@ -201,7 +201,7 @@ def test_applies_seasonal_and_context_adjustments():
         ("clearance_order", "XS9826A", 144, True), # Large clearance quantities acceptable
         ("sample_order", "XS9826A", 2, True)      # Small sample quantities acceptable
     ]
-    
+
     for order_type, product_code, quantity, expected_valid in seasonal_contexts:
         context = f"Order Type: {order_type}"
         result = validate_quantity_with_context(quantity, product_code, context)
@@ -215,47 +215,47 @@ def test_applies_seasonal_and_context_adjustments():
 def validate_quantity_extraction(quantity, product_code, document_context):
     """
     Validate extracted quantity meets Creative-Coop business logic standards.
-    
+
     Args:
         quantity: Extracted quantity (int or convertible)
         product_code (str): Product code for context-specific validation
         document_context (str): Document context for business logic
-        
+
     Returns:
         bool: True if quantity passes validation, False otherwise
     """
-    
+
     if not product_code or quantity is None:
         return False
-    
+
     try:
         # Convert and validate quantity format
         qty = int(float(quantity)) if quantity != 0 else 0
-        
+
         # Basic range validation
         if qty < 0:
             print(f"❌ Negative quantity rejected for {product_code}: {qty}")
             return False
-        
+
         if qty > 1000:  # Reasonable upper bound for Creative-Coop orders
             print(f"⚠️ Unusually high quantity for {product_code}: {qty}")
             return False
-        
+
         # Zero quantities are valid for backordered items
         if qty == 0:
             return True
-        
+
         # Check for placeholder pattern detection
         if is_part_of_placeholder_pattern(qty, product_code, document_context):
             print(f"❌ Placeholder quantity pattern detected for {product_code}: {qty}")
             return False
-        
+
         # Product line specific validation
         if not validate_product_line_quantities(qty, product_code):
             return False
-        
+
         return True
-        
+
     except (ValueError, TypeError):
         print(f"❌ Invalid quantity format for {product_code}: {quantity}")
         return False
@@ -263,15 +263,15 @@ def validate_quantity_extraction(quantity, product_code, document_context):
 def apply_quantity_business_logic(quantity, product_code):
     """
     Apply Creative-Coop business logic corrections to extracted quantities.
-    
+
     Args:
         quantity: Original extracted quantity
         product_code (str): Product code for business rules
-        
+
     Returns:
         int: Corrected quantity or None if correction not possible
     """
-    
+
     if not validate_quantity_extraction(quantity, product_code, ""):
         # Attempt quantity correction based on business rules
         corrected = attempt_quantity_correction(quantity, product_code)
@@ -281,39 +281,39 @@ def apply_quantity_business_logic(quantity, product_code):
         else:
             print(f"❌ Quantity correction failed for {product_code}: {quantity}")
             return None
-    
+
     return int(quantity)
 
 def detect_placeholder_quantities(product_quantities_dict):
     """Detect if quantities follow suspicious placeholder pattern"""
-    
+
     if not product_quantities_dict or len(product_quantities_dict) < 3:
         return False
-    
+
     quantities = list(product_quantities_dict.values())
     unique_quantities = set(quantities)
-    
+
     # If >75% of products have same quantity, likely placeholder
     if len(unique_quantities) == 1 and len(quantities) > 5:
         print(f"⚠️ Placeholder pattern detected: All {len(quantities)} products have quantity {quantities[0]}")
         return True
-    
+
     # Check for suspicious uniformity
     most_common_qty = max(set(quantities), key=quantities.count)
     uniformity_rate = quantities.count(most_common_qty) / len(quantities)
-    
+
     if uniformity_rate > 0.75:
         print(f"⚠️ High uniformity detected: {uniformity_rate:.1%} products have quantity {most_common_qty}")
         return True
-    
+
     return False
 
 def validate_product_line_quantities(quantity, product_code):
     """Validate quantity against product line expectations"""
-    
+
     # Extract product line prefix
     product_line = product_code[:2] if product_code else ""
-    
+
     # Basic product line quantity expectations
     line_expectations = {
         "XS": {"min": 1, "max": 72, "typical_case": 12},
@@ -321,13 +321,13 @@ def validate_product_line_quantities(quantity, product_code):
         "CD": {"min": 1, "max": 144, "typical_case": 24},
         "HX": {"min": 1, "max": 36, "typical_case": 6}
     }
-    
+
     if product_line in line_expectations:
         expectations = line_expectations[product_line]
         if quantity < expectations["min"] or quantity > expectations["max"]:
             print(f"⚠️ Quantity outside expected range for {product_line}: {quantity}")
             return False
-    
+
     return True
 ```
 
@@ -363,7 +363,7 @@ def validate_product_line_quantities(quantity, product_code):
 **Required Metrics**:
 - Quantity validation pass rate percentage
 - Placeholder pattern detection rate
-- Business logic correction success rate  
+- Business logic correction success rate
 - Product line validation compliance rate
 
 **Log Events**:
@@ -396,7 +396,7 @@ logger.warning("Placeholder quantity pattern detected", extra={
 ## Performance Requirements
 
 - [ ] Validate 130+ product quantities in < 15 seconds total
-- [ ] Individual quantity validation completes in < 100ms  
+- [ ] Individual quantity validation completes in < 100ms
 - [ ] Placeholder detection analysis completes in < 5 seconds per invoice
 - [ ] Memory efficient validation for large quantity datasets
 
@@ -410,7 +410,7 @@ logger.warning("Placeholder quantity pattern detected", extra={
 
 **Integration Points**:
 - Called by Tasks 204 & 205 quantity extraction functions
-- Integrates with existing Creative-Coop processing pipeline  
+- Integrates with existing Creative-Coop processing pipeline
 - Uses Document AI context for validation decisions
 
 ## Testing Strategy
@@ -426,7 +426,7 @@ logger.warning("Placeholder quantity pattern detected", extra={
 ### TDD Completion Status: ✅ COMPLETE
 
 **RED Phase**: ✅ Complete - All 13 test methods initially failing as expected
-**GREEN Phase**: ✅ Complete - All tests passing with comprehensive validation logic  
+**GREEN Phase**: ✅ Complete - All tests passing with comprehensive validation logic
 **REFACTOR Phase**: ✅ Complete - Algorithmic business rules with performance optimization
 
 ### Implementation Results
@@ -450,7 +450,7 @@ logger.warning("Placeholder quantity pattern detected", extra={
 
 1. **Placeholder Detection**: Detects suspicious uniform quantity patterns (all products = 24)
 2. **Product Line Validation**: Algorithmic validation by product line (XS, CF, CD, HX) with specific ranges
-3. **Case Pack Logic**: Validates quantities against expected case pack multiples 
+3. **Case Pack Logic**: Validates quantities against expected case pack multiples
 4. **Backorder Business Logic**: Proper handling of ordered/shipped/backordered scenarios
 5. **Distribution Analysis**: Detects unrealistic quantity distributions and arithmetic progressions
 6. **Contextual Validation**: Seasonal and order type adjustments (holiday, clearance, sample orders)
@@ -461,13 +461,13 @@ logger.warning("Placeholder quantity pattern detected", extra={
 
 **Creative-Coop Product Lines**:
 - XS Products: 6-72 range, 12-unit case packs
-- CF Products: 1-48 range, 6-unit case packs  
+- CF Products: 1-48 range, 6-unit case packs
 - CD Products: 12-144 range, 24-unit case packs
 - HX Products: 4-36 range, 6-unit case packs
 
 **Contextual Adjustments**:
 - Holiday Orders: 0-200 quantity range (higher acceptable)
-- Clearance Orders: 0-200 quantity range  
+- Clearance Orders: 0-200 quantity range
 - Sample Orders: 0-10 quantity range (lower acceptable)
 - Regular Orders: 0-50 quantity range (standard)
 

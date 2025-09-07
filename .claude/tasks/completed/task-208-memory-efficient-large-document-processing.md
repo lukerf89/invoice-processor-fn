@@ -36,20 +36,20 @@ def test_processes_15_page_document_within_memory_limit():
     # Arrange - Load full 15-page CS003837319 document
     import psutil
     import os
-    
+
     cs_document = load_test_document('CS003837319_Error_2_docai_output.json')
     process = psutil.Process(os.getpid())
-    
+
     # Get baseline memory usage
     initial_memory = process.memory_info().rss / 1024 / 1024  # MB
-    
+
     # Act - Process large document with memory optimization
     results = process_large_creative_coop_document(cs_document)
-    
+
     # Check memory usage during processing
     peak_memory = process.memory_info().rss / 1024 / 1024  # MB
     memory_used = peak_memory - initial_memory
-    
+
     # Assert - Should stay within reasonable memory bounds
     assert memory_used < 800  # Stay under 800MB additional memory
     assert len(results) >= 130  # Should process expected number of products
@@ -58,23 +58,23 @@ def test_processes_15_page_document_within_memory_limit():
 def test_processes_document_in_chunks_successfully():
     # Test chunked processing functionality
     cs_document = load_test_document('CS003837319_Error_2_docai_output.json')
-    
+
     # Act - Process in 5-page chunks
     chunk_size = 5
     all_results = []
-    
+
     total_pages = len(cs_document.pages)
     for chunk_start in range(0, total_pages, chunk_size):
         chunk_end = min(chunk_start + chunk_size, total_pages)
         chunk_pages = cs_document.pages[chunk_start:chunk_end]
-        
+
         chunk_results = process_document_chunk(chunk_pages, cs_document.text)
         all_results.extend(chunk_results)
-    
+
     # Assert - Chunked processing should be complete
     assert len(all_results) >= 130  # Expected minimum products
     assert len(set(item['product_code'] for item in all_results)) >= 100  # Unique products
-    
+
     # Verify no duplicate processing
     product_codes = [item['product_code'] for item in all_results]
     assert len(product_codes) == len(set(product_codes))  # No duplicates
@@ -82,15 +82,15 @@ def test_processes_document_in_chunks_successfully():
 def test_optimizes_memory_usage_during_processing():
     # Test memory optimization functions
     cs_document = load_test_document('CS003837319_Error_2_docai_output.json')
-    
+
     # Act - Apply memory optimization
     optimized_document = optimize_memory_usage(cs_document)
-    
+
     # Assert - Should maintain functionality while reducing memory footprint
     assert hasattr(optimized_document, 'pages')
     assert hasattr(optimized_document, 'text')
     assert len(optimized_document.pages) == len(cs_document.pages)
-    
+
     # Memory usage should be reduced (can't easily test exact reduction)
     assert optimized_document is not None
 
@@ -99,27 +99,27 @@ def test_cleanup_processed_chunks_frees_memory():
     import gc
     import psutil
     import os
-    
+
     process = psutil.Process(os.getpid())
     initial_memory = process.memory_info().rss / 1024 / 1024
-    
+
     # Create and process chunks
     cs_document = load_test_document('CS003837319_Error_2_docai_output.json')
     processed_chunks = []
-    
+
     for i in range(3):  # Process 3 chunks
         chunk_pages = cs_document.pages[i*5:(i+1)*5]
         chunk_result = process_document_chunk(chunk_pages, cs_document.text)
         processed_chunks.append(chunk_result)
-    
+
     memory_after_processing = process.memory_info().rss / 1024 / 1024
-    
+
     # Act - Cleanup processed chunks
     cleanup_processed_chunks(processed_chunks)
     gc.collect()  # Force garbage collection
-    
+
     memory_after_cleanup = process.memory_info().rss / 1024 / 1024
-    
+
     # Assert - Memory should be reduced after cleanup
     memory_freed = memory_after_processing - memory_after_cleanup
     assert memory_freed >= 0  # Should free some memory (or at least not increase)
@@ -129,17 +129,17 @@ def test_cleanup_processed_chunks_frees_memory():
 ```python
 def test_handles_memory_pressure_gracefully():
     # Test behavior when approaching memory limits
-    
+
     # Simulate memory pressure by creating large document
     large_document = create_memory_intensive_test_document()
-    
+
     try:
         # Act - Process under memory pressure
         results = process_large_creative_coop_document(large_document)
-        
+
         # Assert - Should complete or fail gracefully
         assert results is not None or "handled gracefully"
-        
+
     except MemoryError:
         # Should implement graceful degradation, not crash
         assert False, "Should handle memory pressure gracefully, not crash with MemoryError"
@@ -150,13 +150,13 @@ def test_handles_memory_pressure_gracefully():
 def test_handles_corrupted_chunk_processing():
     # Test handling when some chunks are corrupted
     cs_document = load_test_document('CS003837319_Error_2_docai_output.json')
-    
+
     # Corrupt some pages
     corrupted_document = corrupt_random_pages(cs_document, corruption_rate=0.2)
-    
+
     # Act - Process with corrupted chunks
     results = process_large_creative_coop_document(corrupted_document)
-    
+
     # Assert - Should process what it can, skip corrupted chunks
     assert results is not None
     assert len(results) >= 100  # Should still get most products despite corruption
@@ -166,23 +166,23 @@ def test_handles_timeout_during_large_processing():
     # Test timeout handling for very large documents
     import time
     from unittest.mock import patch
-    
+
     cs_document = load_test_document('CS003837319_Error_2_docai_output.json')
-    
+
     # Mock a slow processing function to trigger timeout
     def slow_chunk_processing(chunk_pages, document_text):
         time.sleep(30)  # Simulate slow processing
         return []
-    
+
     with patch('main.process_document_chunk', side_effect=slow_chunk_processing):
         start_time = time.time()
-        
+
         # Act - Should timeout gracefully
         results = process_large_creative_coop_document(cs_document, timeout=10)
-        
+
         end_time = time.time()
         processing_time = end_time - start_time
-        
+
         # Assert - Should timeout appropriately
         assert processing_time < 20  # Should timeout, not run full 30 seconds per chunk
         assert results is not None or "timeout handled"
@@ -193,15 +193,15 @@ def test_handles_timeout_during_large_processing():
 def test_processes_variable_chunk_sizes_efficiently():
     # Test processing with different chunk sizes for optimization
     cs_document = load_test_document('CS003837319_Error_2_docai_output.json')
-    
+
     chunk_sizes = [3, 5, 7, 10]  # Different chunk sizes
     results_by_chunk_size = {}
-    
+
     for chunk_size in chunk_sizes:
         # Act - Process with different chunk sizes
         results = process_document_with_chunk_size(cs_document, chunk_size)
         results_by_chunk_size[chunk_size] = len(results)
-    
+
     # Assert - All chunk sizes should produce similar results
     result_counts = list(results_by_chunk_size.values())
     max_variance = max(result_counts) - min(result_counts)
@@ -209,15 +209,15 @@ def test_processes_variable_chunk_sizes_efficiently():
 
 def test_handles_single_page_vs_multi_page_optimization():
     # Test that optimization works for both single and multi-page documents
-    
+
     # Single page document
     single_page_doc = create_single_page_test_document()
     single_results = process_large_creative_coop_document(single_page_doc)
-    
-    # Multi-page document  
+
+    # Multi-page document
     cs_document = load_test_document('CS003837319_Error_2_docai_output.json')
     multi_results = process_large_creative_coop_document(cs_document)
-    
+
     # Assert - Both should process successfully
     assert single_results is not None
     assert multi_results is not None
@@ -226,22 +226,22 @@ def test_handles_single_page_vs_multi_page_optimization():
 def test_validates_memory_efficiency_vs_accuracy_tradeoff():
     # Test that memory efficiency doesn't significantly impact accuracy
     cs_document = load_test_document('CS003837319_Error_2_docai_output.json')
-    
+
     # Process with and without memory optimization
     standard_results = process_creative_coop_document_standard(cs_document)
     optimized_results = process_large_creative_coop_document(cs_document)
-    
+
     # Assert - Accuracy should be maintained with optimization
     accuracy_difference = abs(len(standard_results) - len(optimized_results))
     assert accuracy_difference < 5  # Should be very close in product count
-    
+
     # Quality should be maintained
     standard_product_codes = set(item['product_code'] for item in standard_results)
     optimized_product_codes = set(item['product_code'] for item in optimized_results)
-    
+
     overlap = len(standard_product_codes.intersection(optimized_product_codes))
     overlap_percentage = overlap / len(standard_product_codes) if standard_product_codes else 0
-    
+
     assert overlap_percentage >= 0.95  # 95% overlap minimum
 ```
 
@@ -252,27 +252,27 @@ def test_validates_memory_efficiency_vs_accuracy_tradeoff():
 def process_large_creative_coop_document(document, chunk_size=5, timeout=300):
     """
     Memory-efficient processing for large multi-page Creative-Coop documents.
-    
+
     Args:
         document: Document AI document object
         chunk_size (int): Number of pages to process per chunk
         timeout (int): Maximum processing time in seconds
-        
+
     Returns:
         list: Processed line items from all chunks
     """
     import time
     import gc
-    
+
     if not document or not hasattr(document, 'pages'):
         return []
-    
+
     start_time = time.time()
     all_results = []
     total_pages = len(document.pages)
-    
+
     print(f"📄 Processing large document with {total_pages} pages in chunks of {chunk_size}")
-    
+
     try:
         # Process document in chunks to manage memory usage
         for chunk_start in range(0, total_pages, chunk_size):
@@ -280,43 +280,43 @@ def process_large_creative_coop_document(document, chunk_size=5, timeout=300):
             if time.time() - start_time > timeout:
                 print(f"⏱️ Processing timeout reached, stopping at page {chunk_start}")
                 break
-            
+
             chunk_end = min(chunk_start + chunk_size, total_pages)
             print(f"📄 Processing pages {chunk_start + 1}-{chunk_end}")
-            
+
             # Create document chunk
             chunk_pages = document.pages[chunk_start:chunk_end]
-            
+
             # Process chunk
             chunk_results = process_document_chunk(chunk_pages, document.text)
-            
+
             if chunk_results:
                 all_results.extend(chunk_results)
-            
+
             # Memory cleanup after each chunk
             cleanup_processed_chunks([chunk_results])
             del chunk_pages
             gc.collect()
-        
+
         print(f"✅ Completed processing {total_pages} pages, extracted {len(all_results)} items")
         return all_results
-        
+
     except Exception as e:
         print(f"❌ Error in large document processing: {e}")
         return all_results  # Return partial results
 
 def process_document_chunk(chunk_pages, document_text):
     """Process a chunk of document pages efficiently"""
-    
+
     chunk_results = []
-    
+
     try:
         # Extract text from chunk pages
         chunk_text = extract_text_from_pages(chunk_pages)
-        
+
         # Find products in this chunk
         product_codes = extract_product_codes_from_text(chunk_text)
-        
+
         # Process each product found in chunk
         for product_code in product_codes:
             try:
@@ -327,37 +327,37 @@ def process_document_chunk(chunk_pages, document_text):
             except Exception as e:
                 print(f"⚠️ Error processing product {product_code} in chunk: {e}")
                 continue
-        
+
     except Exception as e:
         print(f"❌ Error processing document chunk: {e}")
-    
+
     return chunk_results
 
 def optimize_memory_usage(document):
     """Optimize document memory usage for processing"""
-    
+
     # Create optimized copy with reduced memory footprint
     optimized_doc = type('OptimizedDocument', (), {})()
-    
+
     # Keep essential attributes
     optimized_doc.pages = document.pages
     optimized_doc.text = document.text
-    
+
     # Remove or minimize non-essential attributes
     if hasattr(document, 'entities'):
         # Keep only essential entity data
         optimized_doc.entities = [e for e in document.entities if e.type_ == "line_item"]
-    
+
     return optimized_doc
 
 def cleanup_processed_chunks(processed_chunks):
     """Clean up memory from processed chunks"""
     import gc
-    
+
     for chunk in processed_chunks:
         if chunk:
             chunk.clear() if hasattr(chunk, 'clear') else None
-    
+
     # Force garbage collection
     gc.collect()
 ```

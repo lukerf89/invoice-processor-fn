@@ -200,7 +200,7 @@ class TestEnhancedQuantityExtractionEdgeCases:
         """Test complex scenarios with partial shipments and backorders"""
         complex_text = """
         XS9826A | Product | 100 | 50 | 30 | 70 | each     # Partial shipment, large backorder
-        XS8911A | Product | 24  | 24 | 24 | 0  | each     # Complete shipment  
+        XS8911A | Product | 24  | 24 | 24 | 0  | each     # Complete shipment
         XS9482  | Product | 12  | 6  | 6  | 6  | each     # Split allocation/shipment
         """
 
@@ -218,7 +218,7 @@ class TestEnhancedQuantityExtractionEdgeCases:
         """Test detection of suspicious placeholder patterns"""
         placeholder_text = """
         XS9826A | Product | 24 | 0 | 24 | 0 | each
-        XS8911A | Product | 24 | 0 | 24 | 0 | each  
+        XS8911A | Product | 24 | 0 | 24 | 0 | each
         XS9482  | Product | 24 | 0 | 24 | 0 | each
         """
 

@@ -107,7 +107,7 @@ Retail Price: $2.00
 Page 1: Product listing
 XS9826A 6"H Metal Ballerina Ornament
 
-Page 2: Pricing information  
+Page 2: Pricing information
 Product XS9826A - Unit Price $1.60
         """
 

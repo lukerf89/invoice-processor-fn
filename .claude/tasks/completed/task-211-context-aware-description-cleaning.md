@@ -49,11 +49,11 @@ def test_removes_common_processing_artifacts():
             "clean": "XS9482 Wood Shoe Ornament"
         }
     ]
-    
+
     for case in artifact_cases:
         # Act
         cleaned = clean_description_artifacts(case["dirty"])
-        
+
         # Assert
         assert cleaned == case["clean"]
         assert "Traditional D-code format" not in cleaned
@@ -76,11 +76,11 @@ def test_removes_table_headers_intelligently():
             "clean": "XS9482 Wood Ornament"
         }
     ]
-    
+
     for case in header_cases:
         # Act
         cleaned = clean_table_headers(case["dirty"])
-        
+
         # Assert
         assert cleaned == case["clean"]
         assert "Product Code" not in cleaned
@@ -103,11 +103,11 @@ def test_removes_duplicate_product_codes():
             "clean": "XS9482 Product Wood Ornament"
         }
     ]
-    
+
     for case in duplicate_cases:
-        # Act  
+        # Act
         cleaned = remove_duplicate_codes(case["dirty"], "XS9826A")
-        
+
         # Assert
         product_code = case["dirty"].split()[0]  # Get product code from dirty text
         cleaned_actual = remove_duplicate_codes(case["dirty"], product_code)
@@ -122,15 +122,15 @@ def test_preserves_meaningful_product_information():
             "preserved_elements": ["XS9826A", "191009727774", "6\"H", "4\"W", "Metal", "Ballerina", "Ornament", "Holiday"]
         },
         {
-            "dirty": "XS8911A Product Code 4-3/4\"L × 3-1/2\"W Cotton Lumbar Pillow Description",  
+            "dirty": "XS8911A Product Code 4-3/4\"L × 3-1/2\"W Cotton Lumbar Pillow Description",
             "preserved_elements": ["XS8911A", "4-3/4\"L", "3-1/2\"W", "Cotton", "Lumbar", "Pillow"]
         }
     ]
-    
+
     for case in preservation_cases:
         # Act
         cleaned = clean_description_artifacts(case["dirty"])
-        
+
         # Assert - Should preserve important elements
         for element in case["preserved_elements"]:
             assert element in cleaned, f"Should preserve '{element}' in cleaned description"
@@ -148,12 +148,12 @@ def test_handles_empty_or_invalid_descriptions():
         "Product Code UPC Description Qty Price",  # Only headers
         "|||||||"              # Only separators
     ]
-    
+
     for invalid_input in invalid_cases:
         try:
             # Act
             result = clean_description_artifacts(invalid_input)
-            
+
             # Assert - Should handle gracefully
             if invalid_input is None:
                 assert result == "" or result is None
@@ -167,15 +167,15 @@ def test_handles_malformed_product_codes_in_cleaning():
     # Test cleaning when product codes are malformed or inconsistent
     malformed_cases = [
         "INVALID123 Product Description",
-        "XS Metal Ornament Without Valid Code", 
+        "XS Metal Ornament Without Valid Code",
         "123456 Numeric Product Code",
         "   XS9826A   Extra Spaces Product   "
     ]
-    
+
     for malformed in malformed_cases:
         # Act
         result = clean_description_artifacts(malformed)
-        
+
         # Assert - Should handle malformed input without crashing
         assert isinstance(result, str)
         assert len(result) >= 0
@@ -183,15 +183,15 @@ def test_handles_malformed_product_codes_in_cleaning():
 def test_handles_excessive_artifacts():
     # Test handling of descriptions with excessive artifacts
     excessive_artifacts = """
-    Product Code XS9826A UPC Description Traditional D-code format 
-    $$ Price $$ Your Price List Price || separator || 
+    Product Code XS9826A UPC Description Traditional D-code format
+    $$ Price $$ Your Price List Price || separator ||
     6\"H Metal Ballerina Ornament Holiday Decor
     Qty Price Unit each $$$
     """
-    
+
     # Act
     cleaned = clean_description_artifacts(excessive_artifacts)
-    
+
     # Assert - Should clean extensively while preserving core content
     assert "XS9826A" in cleaned
     assert "Metal Ballerina Ornament" in cleaned
@@ -223,11 +223,11 @@ def test_cleans_various_spacing_and_formatting_issues():
             "clean_pattern": "clean excessive dashes"
         }
     ]
-    
+
     for case in formatting_cases:
         # Act
         cleaned = clean_description_artifacts(case["dirty"])
-        
+
         # Assert - Should normalize formatting
         assert not re.search(r'\s{2,}', cleaned)  # No multiple spaces
         assert not re.search(r',{2,}', cleaned)   # No multiple commas
@@ -250,11 +250,11 @@ def test_handles_special_product_naming_conventions():
             "preserved": ["50%", "Cotton,", "Polyester"]
         }
     ]
-    
+
     for case in naming_cases:
         # Act
         cleaned = clean_description_artifacts(case["dirty"])
-        
+
         # Assert - Should preserve naming conventions
         for preserved_element in case["preserved"]:
             assert preserved_element in cleaned
@@ -262,24 +262,24 @@ def test_handles_special_product_naming_conventions():
 def test_optimizes_cleaning_performance():
     # Test performance optimization for description cleaning
     import time
-    
+
     # Create large batch of descriptions to clean
     dirty_descriptions = []
     for i in range(100):
         dirty_desc = f"Product Code XS{i:04d}A UPC {i:012d} Description Traditional D-code format $$ Price $$ Cotton Product {i} Qty Price"
         dirty_descriptions.append(dirty_desc)
-    
+
     start_time = time.time()
-    
+
     # Act - Clean all descriptions
     cleaned_descriptions = []
     for dirty_desc in dirty_descriptions:
         cleaned = clean_description_artifacts(dirty_desc)
         cleaned_descriptions.append(cleaned)
-    
+
     end_time = time.time()
     cleaning_time = end_time - start_time
-    
+
     # Assert - Should complete within reasonable time
     assert cleaning_time < 5.0  # 100 descriptions in < 5 seconds
     assert len(cleaned_descriptions) == 100
@@ -302,18 +302,18 @@ def test_validates_context_aware_cleaning_decisions():
             "expected_preservations": ["XS8911A", "$1.60", "Cotton", "Pillow"]
         }
     ]
-    
+
     for case in context_cases:
         # Act
         cleaned = apply_context_aware_cleaning(case["description"], case["context"])
-        
+
         # Assert - Context-aware decisions
         for removal in case["expected_removals"]:
             # Should remove redundant elements
             removal_count = case["description"].count(removal)
             cleaned_count = cleaned.count(removal)
             assert cleaned_count < removal_count, f"Should reduce '{removal}' occurrences"
-        
+
         for preservation in case["expected_preservations"]:
             assert preservation in cleaned, f"Should preserve '{preservation}'"
 ```
@@ -325,98 +325,98 @@ def test_validates_context_aware_cleaning_decisions():
 def clean_description_artifacts(description):
     """
     Remove processing artifacts and improve description quality.
-    
+
     Args:
         description (str): Raw description with potential artifacts
-        
+
     Returns:
         str: Cleaned description with artifacts removed
     """
-    
+
     if not description or not isinstance(description, str):
         return ""
-    
+
     cleaned = description
-    
+
     # Remove common Document AI processing artifacts
     artifacts_to_remove = [
         "Traditional D-code format",
         "Product Code",
-        "Description", 
+        "Description",
         "Your Price",
         "List Price",
         "Qty",
         "Unit",
         "UPC"
     ]
-    
+
     for artifact in artifacts_to_remove:
         # Remove artifact but preserve meaningful context
         if cleaned.count(artifact) > 1 or (artifact in cleaned and len(cleaned.split()) > 3):
             cleaned = cleaned.replace(artifact, "")
-    
+
     # Remove pricing and separator artifacts
     cleaned = re.sub(r'\$\$.*?\$\$', '', cleaned)  # Remove $$ price $$ patterns
     cleaned = re.sub(r'\|\|.*?\|\|', '', cleaned)  # Remove || separator || patterns
     cleaned = re.sub(r'\s*\|\s*', ' ', cleaned)    # Replace | separators with spaces
-    
+
     # Clean up spacing and formatting
     cleaned = re.sub(r'\s+', ' ', cleaned)         # Multiple spaces to single
     cleaned = re.sub(r',\s*,+', ',', cleaned)      # Multiple commas to single
     cleaned = re.sub(r'\n+', ' ', cleaned)         # Multiple newlines to space
     cleaned = cleaned.strip()
-    
+
     # Remove trailing commas and artifacts
     cleaned = re.sub(r'[,\s]+$', '', cleaned)
-    
+
     return cleaned
 
 def clean_table_headers(description):
     """Remove table headers that got included in descriptions"""
-    
+
     if not description:
         return ""
-    
+
     cleaned = description
-    
+
     # Common table headers in Creative-Coop invoices
     table_headers = [
-        'Product Code', 'UPC', 'Description', 'Qty Ord', 'Qty Alloc', 
-        'Qty Shipped', 'Qty BkOrd', 'U/M', 'List Price', 'Your Price', 
+        'Product Code', 'UPC', 'Description', 'Qty Ord', 'Qty Alloc',
+        'Qty Shipped', 'Qty BkOrd', 'U/M', 'List Price', 'Your Price',
         'Your Extd Price', 'Unit', 'Price', 'Qty'
     ]
-    
+
     for header in table_headers:
         # Remove header but be careful not to remove legitimate content
         # Only remove if it appears to be a standalone header
         pattern = rf'\b{re.escape(header)}\b(?!\s+[A-Za-z0-9])'
         cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
-    
+
     # Clean up resulting spacing
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-    
+
     return cleaned
 
 def remove_duplicate_codes(description, product_code):
     """Remove duplicate product codes from description"""
-    
+
     if not description or not product_code:
         return description
-    
+
     # Count occurrences of product code
     code_count = description.count(product_code)
-    
+
     if code_count <= 1:
         return description  # No duplicates
-    
+
     cleaned = description
-    
+
     # Allow up to 2 occurrences (one for product code, one in UPC format)
     # Remove excess occurrences
     parts = cleaned.split()
     code_occurrences = 0
     cleaned_parts = []
-    
+
     for part in parts:
         if product_code in part:
             code_occurrences += 1
@@ -425,18 +425,18 @@ def remove_duplicate_codes(description, product_code):
             # Skip additional occurrences
         else:
             cleaned_parts.append(part)
-    
+
     return ' '.join(cleaned_parts)
 
 def remove_processing_artifacts(description):
     """Remove specific Document AI processing artifacts"""
     import re
-    
+
     if not description:
         return ""
-    
+
     cleaned = description
-    
+
     # Remove specific processing noise patterns
     processing_patterns = [
         r'\b\d{12}\b(?=\s+\d{12})',  # Duplicate UPC codes
@@ -445,20 +445,20 @@ def remove_processing_artifacts(description):
         r'(?:,\s*){3,}',  # Excessive commas
         r'(?:\|\s*){2,}',  # Multiple pipe separators
     ]
-    
+
     for pattern in processing_patterns:
         cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
-    
+
     # Normalize spacing after artifact removal
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-    
+
     return cleaned
 
 def apply_context_aware_cleaning(description, context_type="general"):
     """Apply context-aware cleaning based on document context"""
-    
+
     cleaned = description
-    
+
     if context_type == "product_listing":
         # More aggressive removal of listing artifacts
         cleaned = clean_table_headers(cleaned)
@@ -468,10 +468,10 @@ def apply_context_aware_cleaning(description, context_type="general"):
         price_headers = ["Your Price", "List Price", "Unit Price", "Extended"]
         for header in price_headers:
             cleaned = cleaned.replace(header, "")
-    
+
     # Apply general cleaning
     cleaned = clean_description_artifacts(cleaned)
-    
+
     return cleaned
 ```
 
@@ -563,5 +563,5 @@ logger.debug("Processing artifacts detected", extra={
 - [ ] Unit tests for various artifact removal patterns
 - [ ] Context-aware cleaning decision testing
 - [ ] Performance testing with bulk description cleaning
-- [ ] Error handling for malformed and excessive artifact scenarios  
+- [ ] Error handling for malformed and excessive artifact scenarios
 - [ ] Integration testing with description extraction functions

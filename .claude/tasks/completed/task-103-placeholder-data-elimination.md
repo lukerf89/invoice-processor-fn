@@ -35,7 +35,7 @@ def test_identical_price_quantity_combinations_exist():
             rows = list(reader)[1:]  # Skip header
     except FileNotFoundError:
         pytest.skip("Production output file not available")
-    
+
     # Extract price/quantity combinations
     price_qty_combinations = []
     for row in rows:
@@ -44,20 +44,20 @@ def test_identical_price_quantity_combinations_exist():
             quantity = row[5] if len(row) > 5 else ""
             if price and quantity:
                 price_qty_combinations.append((price, quantity))
-    
+
     # Count occurrences
     combination_counts = Counter(price_qty_combinations)
-    
+
     # Find combinations that appear multiple times
     duplicate_combinations = {combo: count for combo, count in combination_counts.items() if count > 1}
-    
+
     # RED: Should find duplicate combinations (especially $1.60, 24)
     assert len(duplicate_combinations) > 0, f"Expected duplicate price/qty combinations, found: {duplicate_combinations}"
-    
+
     # Check specifically for $1.60, 24 placeholder
     placeholder_count = combination_counts.get(("$1.60", "24"), 0)
     assert placeholder_count > 10, f"Expected many '$1.60, 24' placeholders, found: {placeholder_count}"
-    
+
     print(f"Found {len(duplicate_combinations)} duplicate price/quantity combinations")
     print(f"'$1.60, 24' appears {placeholder_count} times")
 
@@ -65,14 +65,14 @@ def test_traditional_d_code_format_descriptions_exist():
     """Test that current output contains 'Traditional D-code format' descriptions - RED test"""
     # Process CS003837319_Error with current implementation
     import json
-    
+
     with open('test_invoices/CS003837319_Error_docai_output.json', 'r') as f:
         doc_data = json.load(f)
-    
+
     mock_document = Mock()
     mock_document.text = doc_data.get('text', '')
     mock_document.entities = []
-    
+
     # Add mock entities to simulate current processing
     for entity_data in doc_data.get('entities', []):
         if entity_data.get('type') == 'line_item':
@@ -80,9 +80,9 @@ def test_traditional_d_code_format_descriptions_exist():
             entity.type_ = entity_data.get('type')
             entity.mention_text = entity_data.get('mentionText', '')
             mock_document.entities.append(entity)
-    
+
     results = process_creative_coop_document(mock_document)
-    
+
     # Count "Traditional D-code format" entries
     traditional_entries = []
     for row in results:
@@ -90,7 +90,7 @@ def test_traditional_d_code_format_descriptions_exist():
             description = str(row[3])
             if "Traditional D-code format" in description:
                 traditional_entries.append(row)
-    
+
     # RED: Should find placeholder descriptions in current output
     assert len(traditional_entries) > 0, f"Expected 'Traditional D-code format' entries, found: {len(traditional_entries)}"
     print(f"Found {len(traditional_entries)} 'Traditional D-code format' placeholder descriptions")
@@ -99,9 +99,9 @@ def test_fallback_logic_exists_in_current_code():
     """Test that current code contains fallback logic for incomplete products - RED test"""
     import inspect
     from main import process_creative_coop_document
-    
+
     source = inspect.getsource(process_creative_coop_document)
-    
+
     # Check for fallback patterns that generate placeholder data
     fallback_indicators = [
         "Traditional D-code format",
@@ -110,21 +110,21 @@ def test_fallback_logic_exists_in_current_code():
         "fallback",
         "default"
     ]
-    
+
     found_fallbacks = []
     for indicator in fallback_indicators:
         if indicator in source:
             found_fallbacks.append(indicator)
-    
+
     # RED: Should find fallback logic in current implementation
     assert len(found_fallbacks) > 0, f"Expected fallback logic indicators, found: {found_fallbacks}"
 
 def test_low_data_quality_products_generate_placeholders():
     """Test that products without sufficient data generate placeholder entries - RED test"""
-    
+
     # Create minimal test data that should trigger placeholder generation
     test_entity_text = "XS9999 incomplete data"  # Product code without UPC or full description
-    
+
     # Mock a document with incomplete product data
     mock_document = Mock()
     mock_document.text = f"ORDER NO: TEST123\nDate: 01/01/2025\n{test_entity_text}"
@@ -133,9 +133,9 @@ def test_low_data_quality_products_generate_placeholders():
         Mock(type_="invoice_date", mention_text="01/01/2025"),
         Mock(type_="line_item", mention_text=test_entity_text)
     ]
-    
+
     results = process_creative_coop_document(mock_document)
-    
+
     # RED: Current implementation should generate some output even with incomplete data
     # This demonstrates the fallback behavior that needs to be eliminated
     placeholder_like_entries = []
@@ -144,13 +144,13 @@ def test_low_data_quality_products_generate_placeholders():
             price = row[4] if len(row) > 4 else ""
             quantity = row[5] if len(row) > 5 else ""
             description = row[3] if len(row) > 3 else ""
-            
+
             # Check for placeholder-like patterns
-            if (price in ["$1.60", "$0.00"] or 
-                quantity in ["24", "0"] or 
+            if (price in ["$1.60", "$0.00"] or
+                quantity in ["24", "0"] or
                 "Traditional" in str(description)):
                 placeholder_like_entries.append(row)
-    
+
     # RED: Should find placeholder-like entries with incomplete input
     # Note: This might pass if current implementation already skips incomplete products
     # In that case, we need to examine the actual fallback logic more specifically
@@ -166,11 +166,11 @@ def test_quantity_price_variance_is_low():
             rows = list(reader)[1:]  # Skip header
     except FileNotFoundError:
         pytest.skip("Production output file not available")
-    
+
     # Extract numeric prices and quantities
     prices = []
     quantities = []
-    
+
     for row in rows:
         if len(row) >= 6:
             try:
@@ -178,27 +178,27 @@ def test_quantity_price_variance_is_low():
                 price_str = row[4].replace('$', '').replace(',', '') if row[4] else '0'
                 price = float(price_str)
                 prices.append(price)
-                
+
                 # Parse quantity
                 qty_str = row[5] if row[5] else '0'
                 quantity = int(qty_str)
                 quantities.append(quantity)
             except (ValueError, IndexError):
                 continue
-    
+
     # Calculate variance
     if prices:
         price_variance = len(set(prices)) / len(prices)
         print(f"Price variance: {price_variance:.2%} ({len(set(prices))} unique / {len(prices)} total)")
-    
+
     if quantities:
-        qty_variance = len(set(quantities)) / len(quantities)  
+        qty_variance = len(set(quantities)) / len(quantities)
         print(f"Quantity variance: {qty_variance:.2%} ({len(set(quantities))} unique / {len(quantities)} total)")
-    
+
     # RED: Low variance indicates placeholder data dominance
     if prices:
         assert price_variance < 0.5, f"Expected low price variance due to placeholders, got: {price_variance:.2%}"
-    
+
     if quantities:
         assert qty_variance < 0.5, f"Expected low quantity variance due to placeholders, got: {qty_variance:.2%}"
 ```
@@ -210,7 +210,7 @@ Remove fallback logic and implement strict data quality gates:
 ```python
 def process_creative_coop_document_no_placeholders(document):
     """Process Creative-Coop documents WITHOUT generating placeholder data"""
-    
+
     # Handle edge cases gracefully
     if not document or not hasattr(document, "text") or document.text is None:
         print("Warning: Document text is None or missing, returning empty results")
@@ -219,10 +219,10 @@ def process_creative_coop_document_no_placeholders(document):
     # Extract basic invoice info
     entities = {e.type_: e.mention_text for e in document.entities}
     vendor = "Creative-Coop"
-    
+
     # Enhanced invoice number extraction (from Task 101)
     invoice_number = extract_creative_coop_invoice_number(document.text, entities)
-    
+
     # Enhanced date extraction
     invoice_date = format_date(entities.get("invoice_date", ""))
     if not invoice_date:
@@ -241,7 +241,7 @@ def process_creative_coop_document_no_placeholders(document):
 
     # Get enhanced product mappings (from Task 102)
     product_mappings = extract_creative_coop_product_mappings_enhanced(document.text)
-    
+
     if not product_mappings:
         print("⚠️ No product mappings found - returning empty results to avoid placeholders")
         return []
@@ -249,39 +249,39 @@ def process_creative_coop_document_no_placeholders(document):
     # Process entities with STRICT data quality requirements
     rows = []
     processed_products = set()
-    
+
     for entity in document.entities:
         if entity.type_ == "line_item":
             entity_text = entity.mention_text
-            
+
             # Extract products from this entity
             product_codes = extract_creative_coop_product_codes(entity_text)
-            
+
             for product_code in product_codes:
                 if product_code in processed_products:
                     continue  # Skip duplicates
-                
+
                 # STRICT REQUIREMENT: Must have mapping data
                 if product_code not in product_mappings:
                     print(f"❌ Skipping {product_code}: No complete mapping data found")
                     continue
-                
+
                 product_data = product_mappings[product_code]
-                
+
                 # Extract pricing and quantity with STRICT validation
                 price_data = extract_real_price_data(entity_text, document.text, product_code)
                 quantity_data = extract_real_quantity_data(entity_text, document.text, product_code)
-                
+
                 # QUALITY GATE: Only proceed if we have REAL data
                 if not price_data or not quantity_data:
                     print(f"❌ Skipping {product_code}: Insufficient price/quantity data")
                     continue
-                
+
                 # VALIDATION: Ensure data is not placeholder-like
                 if is_placeholder_data(price_data, quantity_data, product_data["description"]):
                     print(f"❌ Skipping {product_code}: Data appears to be placeholder")
                     continue
-                
+
                 # Build row with VALIDATED data only
                 row = [
                     vendor,
@@ -291,10 +291,10 @@ def process_creative_coop_document_no_placeholders(document):
                     price_data["formatted_price"],
                     str(quantity_data["quantity"])
                 ]
-                
+
                 rows.append(row)
                 processed_products.add(product_code)
-                
+
                 print(f"✓ Processed {product_code}: Price={price_data['formatted_price']}, Qty={quantity_data['quantity']}")
 
     print(f"Final output: {len(rows)} products processed with complete data (no placeholders)")
@@ -302,14 +302,14 @@ def process_creative_coop_document_no_placeholders(document):
 
 def extract_real_price_data(entity_text, document_text, product_code):
     """Extract REAL price data or return None (no placeholders)"""
-    
+
     # Strategy 1: Look for wholesale price patterns in entity
     wholesale_patterns = [
         r"(\d+)\s+(\d+)\s+(?:lo\s+)?(?:each|Set)\s+(\d+\.\d{2})\s+(\d+\.\d{2})\s+(\d+\.\d{2})",
         r"wholesale[:\s]+\$?(\d+\.\d{2})",
         r"w/s[:\s]+\$?(\d+\.\d{2})"
     ]
-    
+
     for pattern in wholesale_patterns:
         matches = re.findall(pattern, entity_text, re.IGNORECASE)
         if matches:
@@ -328,7 +328,7 @@ def extract_real_price_data(entity_text, document_text, product_code):
                     "formatted_price": f"${price}",
                     "extraction_method": "direct_wholesale"
                 }
-    
+
     # Strategy 2: Look for price near product code in wider document context
     code_position = document_text.find(product_code)
     if code_position != -1:
@@ -336,12 +336,12 @@ def extract_real_price_data(entity_text, document_text, product_code):
         start = max(0, code_position - 250)
         end = min(len(document_text), code_position + 250)
         context = document_text[start:end]
-        
+
         price_patterns = [
             r"\$(\d+\.\d{2})",
             r"(\d+\.\d{2})\s*(?:each|ea|per|unit)"
         ]
-        
+
         for pattern in price_patterns:
             matches = re.findall(pattern, context)
             if matches:
@@ -357,21 +357,21 @@ def extract_real_price_data(entity_text, document_text, product_code):
                         }
                 except ValueError:
                     continue
-    
+
     # NO FALLBACK - return None if no real price found
     print(f"⚠️ No real price data found for {product_code}")
     return None
 
 def extract_real_quantity_data(entity_text, document_text, product_code):
     """Extract REAL quantity data or return None (no placeholders)"""
-    
+
     # Strategy 1: Look for Creative-Coop quantity patterns
     quantity_patterns = [
         r"(\d+)\s+(\d+)\s+(?:lo\s+)?(?:each|Set)",  # "ordered back unit" format
         r"(?:qty|quantity)[:\s]+(\d+)",
         r"(\d+)\s+(?:pcs|pieces|units|ea|each)"
     ]
-    
+
     for pattern in quantity_patterns:
         matches = re.findall(pattern, entity_text, re.IGNORECASE)
         if matches:
@@ -397,14 +397,14 @@ def extract_real_quantity_data(entity_text, document_text, product_code):
                         }
                 except ValueError:
                     continue
-    
+
     # Strategy 2: Look for quantity near product code in document context
     code_position = document_text.find(product_code)
     if code_position != -1:
         start = max(0, code_position - 100)
         end = min(len(document_text), code_position + 100)
         context = document_text[start:end]
-        
+
         qty_numbers = re.findall(r'\b(\d+)\b', context)
         for qty_str in qty_numbers:
             try:
@@ -416,37 +416,37 @@ def extract_real_quantity_data(entity_text, document_text, product_code):
                     }
             except ValueError:
                 continue
-    
+
     # NO FALLBACK - return None if no real quantity found
     print(f"⚠️ No real quantity data found for {product_code}")
     return None
 
 def is_placeholder_data(price_data, quantity_data, description):
     """Check if extracted data appears to be placeholder/fallback data"""
-    
+
     # Check for known placeholder patterns
     placeholder_indicators = [
         # Price indicators
         price_data.get("raw_price") == "1.60",
         price_data.get("formatted_price") == "$1.60",
-        
-        # Quantity indicators  
+
+        # Quantity indicators
         quantity_data.get("quantity") == 24,
-        
+
         # Description indicators
         "Traditional D-code format" in description,
         "placeholder" in description.lower(),
         "default" in description.lower(),
         len(description) < 5,  # Too short descriptions
-        
+
         # Combined suspicious patterns
         (price_data.get("raw_price") == "1.60" and quantity_data.get("quantity") == 24),
     ]
-    
+
     if any(placeholder_indicators):
         print(f"⚠️ Detected placeholder data: Price={price_data.get('formatted_price')}, Qty={quantity_data.get('quantity')}, Desc='{description[:30]}...'")
         return True
-    
+
     return False
 ```
 
@@ -458,7 +458,7 @@ Implement comprehensive data validation and quality metrics:
 # Add data quality validation framework
 class CreativeCooProductDataValidator:
     """Validates Creative-Coop product data quality and eliminates placeholders"""
-    
+
     def __init__(self):
         self.validation_rules = {
             "price_range": (0.01, 1000.00),
@@ -478,104 +478,104 @@ class CreativeCooProductDataValidator:
             "failed_description_validation": 0,
             "flagged_as_placeholder": 0
         }
-    
+
     def validate_product_data(self, product_code, price_data, quantity_data, description):
         """Comprehensive validation of product data quality"""
         self.stats["total_evaluated"] += 1
-        
+
         validation_results = {
             "valid": True,
             "reasons": []
         }
-        
+
         # Price validation
         if not self._validate_price(price_data):
             validation_results["valid"] = False
             validation_results["reasons"].append("Invalid price data")
             self.stats["failed_price_validation"] += 1
-        
+
         # Quantity validation
         if not self._validate_quantity(quantity_data):
             validation_results["valid"] = False
             validation_results["reasons"].append("Invalid quantity data")
             self.stats["failed_quantity_validation"] += 1
-        
+
         # Description validation
         if not self._validate_description(description):
             validation_results["valid"] = False
             validation_results["reasons"].append("Invalid description")
             self.stats["failed_description_validation"] += 1
-        
+
         # Placeholder detection
         if self._is_placeholder_pattern(price_data, quantity_data, description):
             validation_results["valid"] = False
             validation_results["reasons"].append("Detected placeholder pattern")
             self.stats["flagged_as_placeholder"] += 1
-        
+
         if validation_results["valid"]:
             self.stats["passed_validation"] += 1
             print(f"✓ {product_code}: Validation PASSED")
         else:
             print(f"❌ {product_code}: Validation FAILED - {', '.join(validation_results['reasons'])}")
-        
+
         return validation_results
-    
+
     def _validate_price(self, price_data):
         """Validate price data quality"""
         if not price_data or not price_data.get("raw_price"):
             return False
-        
+
         try:
             price = float(price_data["raw_price"])
             min_price, max_price = self.validation_rules["price_range"]
             return min_price <= price <= max_price
         except (ValueError, TypeError):
             return False
-    
+
     def _validate_quantity(self, quantity_data):
         """Validate quantity data quality"""
         if not quantity_data or quantity_data.get("quantity") is None:
             return False
-        
+
         try:
             qty = int(quantity_data["quantity"])
             min_qty, max_qty = self.validation_rules["quantity_range"]
             return min_qty <= qty <= max_qty
         except (ValueError, TypeError):
             return False
-    
+
     def _validate_description(self, description):
         """Validate description quality"""
         if not description or len(description) < self.validation_rules["min_description_length"]:
             return False
-        
+
         return True
-    
+
     def _is_placeholder_pattern(self, price_data, quantity_data, description):
         """Check for known placeholder patterns"""
         patterns = self.validation_rules["placeholder_patterns"]
-        
+
         # Check price placeholders
         if price_data and price_data.get("raw_price") in patterns["prices"]:
             return True
-        
+
         # Check quantity placeholders
         if quantity_data and quantity_data.get("quantity") in patterns["quantities"]:
             return True
-        
+
         # Check description placeholders
         for placeholder_desc in patterns["descriptions"]:
             if placeholder_desc.lower() in description.lower():
                 return True
-        
+
         return False
-    
+
     def get_validation_report(self):
         """Generate validation statistics report"""
         total = self.stats["total_evaluated"]
         if total == 0:
             return "No products evaluated"
-        
+
         report = f"""
 Data Quality Validation Report:
 - Total Products Evaluated: {total}
@@ -590,55 +590,55 @@ Data Quality Validation Report:
 
 def process_creative_coop_document_validated(document):
     """Process Creative-Coop documents with comprehensive validation (no placeholders)"""
-    
+
     validator = CreativeCooProductDataValidator()
-    
+
     # ... (previous processing logic) ...
-    
+
     rows = []
     processed_products = set()
-    
+
     for entity in document.entities:
         if entity.type_ == "line_item":
             entity_text = entity.mention_text
             product_codes = extract_creative_coop_product_codes(entity_text)
-            
+
             for product_code in product_codes:
                 if product_code in processed_products:
                     continue
-                
+
                 if product_code not in product_mappings:
                     continue
-                
+
                 product_data = product_mappings[product_code]
                 price_data = extract_real_price_data(entity_text, document.text, product_code)
                 quantity_data = extract_real_quantity_data(entity_text, document.text, product_code)
-                
+
                 # COMPREHENSIVE VALIDATION
                 validation = validator.validate_product_data(
                     product_code, price_data, quantity_data, product_data["description"]
                 )
-                
+
                 if not validation["valid"]:
                     print(f"❌ Skipping {product_code}: {', '.join(validation['reasons'])}")
                     continue
-                
+
                 # Build validated row
                 row = [
                     vendor,
-                    invoice_number, 
+                    invoice_number,
                     product_code,
                     product_data["description"],
                     price_data["formatted_price"],
                     str(quantity_data["quantity"])
                 ]
-                
+
                 rows.append(row)
                 processed_products.add(product_code)
-    
+
     # Print validation report
     print(validator.get_validation_report())
-    
+
     print(f"Final output: {len(rows)} products with VALIDATED data (zero placeholders)")
     return rows
 ```
@@ -670,7 +670,7 @@ def process_creative_coop_document_validated(document):
 - [ ] **Placeholder Elimination**: No fallback logic generates "$1.60, 24" or similar entries
 - [ ] **Data Validation**: Comprehensive quality gates prevent placeholder-like data
 - [ ] **Price Uniqueness**: All prices are algorithmically derived from document data
-- [ ] **Quantity Uniqueness**: All quantities are algorithmically derived from document data  
+- [ ] **Quantity Uniqueness**: All quantities are algorithmically derived from document data
 - [ ] **Description Quality**: No "Traditional D-code format" or similar placeholder text
 - [ ] **Validation Framework**: Consistent data quality validation across all products
 - [ ] **Error Handling**: Graceful handling of incomplete data without generating placeholders
@@ -709,7 +709,7 @@ def process_creative_coop_document_validated(document):
 
 - CS003837319_Error production output CSV for baseline comparison
 - Enhanced product extraction from Task 102
-- Enhanced invoice number extraction from Task 101  
+- Enhanced invoice number extraction from Task 101
 - Performance monitoring to ensure validation doesn't impact speed
 
 ## Expected Impact
@@ -723,7 +723,7 @@ def process_creative_coop_document_validated(document):
 
 ## ✅ TASK ALREADY COMPLETED - Implementation Notes
 
-**Completion Date**: 2025-01-05  
+**Completion Date**: 2025-01-05
 **Status**: ALREADY IMPLEMENTED IN TASK 102
 **Result**: ALL ACCEPTANCE CRITERIA ALREADY MET
 
@@ -786,11 +786,11 @@ This task was **automatically completed** as part of Task 102 (Product Processin
 Task 103 objectives were **comprehensively achieved** during Task 102 implementation:
 
 1. **Scope Overlap**: Task 102's scope expansion naturally eliminated placeholder data
-2. **Quality Enhancement**: Enhanced extraction removed need for fallback placeholders  
+2. **Quality Enhancement**: Enhanced extraction removed need for fallback placeholders
 3. **Technical Excellence**: All validation and quality requirements already implemented
 4. **Superior Results**: Achieved all Task 103 goals plus additional improvements
 
-**Recommendation**: 
+**Recommendation**:
 - Mark Task 103 as completed (goals achieved in Task 102)
 - No additional implementation required
 - Proceed directly to Task 104 (Integration Testing)

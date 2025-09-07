@@ -2,7 +2,7 @@
 
 ## Executive Summary
 **Business Objective**: Elevate Creative Coop processing from operational state (85%) to high-performance state (90%+) with comprehensive data quality enhancements, accurate price/quantity extraction, and optimized multi-page processing.
-**Success Criteria**: 
+**Success Criteria**:
 - Processing accuracy: 85% → 90%+ field-level accuracy
 - Price extraction: 50% → 95% accurate wholesale price identification
 - Quantity extraction: 50% → 90% accurate shipped quantity parsing
@@ -51,20 +51,20 @@ graph TD
     D --> E[Description Quality Enhancement]
     E --> F[Performance Tuning]
     F --> G[Comprehensive Validation]
-    
+
     H[Creative Coop Invoice Data] --> I[Tabular Structure Analysis]
     I --> J[Price Column Identification]
     J --> K[Wholesale vs List Price Logic]
     K --> B
-    
+
     L[Quantity Data Processing] --> M[Shipped vs Ordered Logic]
     M --> N[Backorder Handling]
     N --> C
-    
+
     O[15-Page Document] --> P[Page Boundary Processing]
     P --> Q[Entity Continuation Logic]
     Q --> D
-    
+
     R[Product Descriptions] --> S[UPC Integration]
     S --> T[Context-Aware Cleaning]
     T --> E
@@ -100,13 +100,13 @@ graph TD
 def extract_tabular_price_creative_coop_enhanced(document_text, product_code):
     """
     Extract wholesale prices from Creative Coop tabular format with enhanced accuracy
-    
-    Table Structure: Product Code | UPC | RT | Qty Ord | Qty Alloc | Qty Shipped | 
+
+    Table Structure: Product Code | UPC | RT | Qty Ord | Qty Alloc | Qty Shipped |
                      Qty BkOrd | U/M | List Price | Your Price | Your Extd Price
     """
     # Search for product code in tabular context
     product_pattern = rf"{re.escape(product_code)}\s+"
-    
+
     # Look for tabular row containing the product
     for line in document_text.split('\n'):
         if re.search(product_pattern, line, re.IGNORECASE):
@@ -117,29 +117,29 @@ def extract_tabular_price_creative_coop_enhanced(document_text, product_code):
                 wholesale_price = price_matches[-2]  # Your Price column
                 print(f"✅ Extracted wholesale price for {product_code}: ${wholesale_price}")
                 return f"${wholesale_price}"
-    
+
     # Fallback to multi-tier extraction
     return extract_multi_tier_price_creative_coop_enhanced(document_text, product_code)
 
 # Step 2: Multi-tier price extraction with pattern recognition
 def extract_multi_tier_price_creative_coop_enhanced(document_text, product_code):
     """Multi-tier price extraction for complex Creative Coop formats"""
-    
+
     # Tier 1: Direct tabular extraction
     tabular_price = extract_price_from_tabular_context(document_text, product_code)
     if tabular_price:
         return tabular_price
-    
+
     # Tier 2: Pattern-based extraction around product code
     pattern_price = extract_price_from_product_context(document_text, product_code)
     if pattern_price:
         return pattern_price
-    
+
     # Tier 3: Page-based price extraction for multi-page documents
     page_price = extract_price_from_page_context(document_text, product_code)
     if page_price:
         return page_price
-    
+
     print(f"⚠️ No price found for {product_code}, using fallback logic")
     return extract_price_fallback_logic(document_text, product_code)
 
@@ -148,17 +148,17 @@ def validate_price_extraction(price, product_code, document_text):
     """Validate extracted price makes business sense"""
     try:
         price_value = float(price.replace('$', ''))
-        
+
         # Business logic validation
         if price_value < 0.10 or price_value > 1000:
             print(f"⚠️ Price validation warning for {product_code}: ${price_value}")
             return False
-        
+
         # Check for placeholder prices
         if price_value == 1.60:  # Known placeholder value
             print(f"❌ Placeholder price detected for {product_code}: ${price_value}")
             return False
-            
+
         return True
     except ValueError:
         print(f"❌ Invalid price format for {product_code}: {price}")
@@ -193,27 +193,27 @@ def rollback_to_phase01_price_extraction(document_text, product_code):
 def extract_creative_coop_quantity_enhanced(document_text, product_code):
     """
     Extract quantities from Creative Coop format with shipped quantity priority
-    
+
     Logic Priority:
     1. Qty Shipped (primary - for items actually received)
     2. Qty Ordered (for backordered items with 0 shipped)
     3. Context-based extraction for edge cases
     """
-    
+
     # Find product line in tabular format
     product_pattern = rf"{re.escape(product_code)}\s+"
-    
+
     for line in document_text.split('\n'):
         if re.search(product_pattern, line, re.IGNORECASE):
             # Extract quantity columns from table structure
             quantities = re.findall(r'\b(\d+)\b', line)
-            
+
             if len(quantities) >= 4:  # Expect: Ord, Alloc, Shipped, BkOrd
                 qty_ord = int(quantities[0]) if quantities[0] else 0
                 qty_alloc = int(quantities[1]) if quantities[1] else 0
                 qty_shipped = int(quantities[2]) if quantities[2] else 0
                 qty_bkord = int(quantities[3]) if quantities[3] else 0
-                
+
                 # Business logic: Use shipped quantity if > 0, otherwise use ordered for backordered items
                 if qty_shipped > 0:
                     print(f"✅ Using shipped quantity for {product_code}: {qty_shipped}")
@@ -224,14 +224,14 @@ def extract_creative_coop_quantity_enhanced(document_text, product_code):
                 else:
                     print(f"ℹ️ No valid quantity found for {product_code}")
                     return 0
-    
+
     # Fallback to pattern-based extraction
     return extract_quantity_from_pattern_context(document_text, product_code)
 
 # Step 2: Multi-line quantity extraction for complex formats
 def extract_quantity_from_multiline_enhanced(text, product_code):
     """Handle quantity extraction from multi-line Creative Coop formats"""
-    
+
     # Search in expanded context around product code
     lines = text.split('\n')
     for i, line in enumerate(lines):
@@ -239,27 +239,27 @@ def extract_quantity_from_multiline_enhanced(text, product_code):
             # Check current line and next 2 lines for quantity data
             context_lines = lines[i:i+3]
             context_text = ' '.join(context_lines)
-            
+
             # Pattern: Look for quantity in "shipped back unit" format
             quantity_pattern = r'(\d+)\s+(\d+)\s+\w+\s+(?:each|set|case|piece)'
             match = re.search(quantity_pattern, context_text, re.IGNORECASE)
-            
+
             if match:
                 shipped_qty = int(match.group(1))
                 back_qty = int(match.group(2))
-                
+
                 # Use shipped if > 0, otherwise use total ordered
                 if shipped_qty > 0:
                     return shipped_qty
                 elif shipped_qty == 0 and back_qty > 0:
                     return back_qty
-    
+
     return 0
 
 # Step 3: Quantity validation and business logic checks
 def validate_quantity_extraction(quantity, product_code, document_text):
     """Validate extracted quantity makes business sense"""
-    
+
     # Check for placeholder quantities (known issue: "24" for all items)
     if quantity == 24:
         # Verify this is actually correct, not a placeholder
@@ -267,12 +267,12 @@ def validate_quantity_extraction(quantity, product_code, document_text):
         if actual_qty != 24:
             print(f"❌ Placeholder quantity detected for {product_code}: {quantity}")
             return False
-    
+
     # Business validation
     if quantity < 0 or quantity > 1000:
         print(f"⚠️ Quantity validation warning for {product_code}: {quantity}")
         return False
-    
+
     return True
 ```
 
@@ -303,39 +303,39 @@ def rollback_to_phase01_quantity_extraction(document_text, product_code):
 # Step 1: Page boundary processing validation
 def validate_multi_page_processing(document):
     """Ensure complete processing across all document pages"""
-    
+
     total_pages = len(document.pages)
     print(f"📄 Processing document with {total_pages} pages")
-    
+
     # Track products found per page
     products_per_page = {}
     total_products = set()
-    
+
     for page_num, page in enumerate(document.pages, 1):
         page_text = getattr(page, 'text', '') if hasattr(page, 'text') else ''
-        
+
         # Extract product codes from this page
         product_codes = extract_product_codes_from_page(page_text)
         products_per_page[page_num] = len(product_codes)
         total_products.update(product_codes)
-        
+
         print(f"  Page {page_num}: {len(product_codes)} products")
-    
+
     print(f"📊 Total unique products across all pages: {len(total_products)}")
     return total_products, products_per_page
 
 # Step 2: Enhanced entity processing with page context
 def process_entities_with_page_awareness(document):
     """Process Document AI entities with awareness of page boundaries"""
-    
+
     processed_products = set()
     entity_product_map = {}
-    
+
     for entity in document.entities:
         if entity.type_ == "line_item":
             # Determine which page this entity belongs to
             page_num = determine_entity_page(entity, document)
-            
+
             # Extract product code from entity
             product_code = extract_product_code_from_entity(entity)
             if product_code and product_code not in processed_products:
@@ -345,35 +345,35 @@ def process_entities_with_page_awareness(document):
                     'processed': False
                 }
                 processed_products.add(product_code)
-    
+
     print(f"🔍 Mapped {len(entity_product_map)} products to entities")
     return entity_product_map
 
 # Step 3: Memory-efficient large document processing
 def process_large_creative_coop_document(document):
     """Memory-efficient processing for large multi-page documents"""
-    
+
     # Process document in chunks to manage memory usage
     chunk_size = 5  # Process 5 pages at a time
     all_results = []
-    
+
     total_pages = len(document.pages)
-    
+
     for chunk_start in range(0, total_pages, chunk_size):
         chunk_end = min(chunk_start + chunk_size, total_pages)
-        
+
         print(f"📄 Processing pages {chunk_start + 1}-{chunk_end}")
-        
+
         # Create document chunk
         chunk_pages = document.pages[chunk_start:chunk_end]
         chunk_results = process_document_chunk(chunk_pages, document.text)
-        
+
         all_results.extend(chunk_results)
-        
+
         # Memory cleanup
         del chunk_pages
         gc.collect()
-    
+
     print(f"✅ Completed processing {total_pages} pages, extracted {len(all_results)} items")
     return all_results
 ```
@@ -405,10 +405,10 @@ def rollback_to_single_pass_processing(document):
 # Step 1: Enhanced description extraction with UPC integration
 def extract_enhanced_product_description(document_text, product_code, upc_code=None):
     """Extract complete product descriptions with UPC integration"""
-    
+
     # Primary extraction: Find description in product context
     description = extract_description_from_product_context(document_text, product_code)
-    
+
     # Enhance with UPC code if available
     if upc_code:
         enhanced_description = f"{product_code} - UPC: {upc_code} - {description}"
@@ -419,40 +419,40 @@ def extract_enhanced_product_description(document_text, product_code, upc_code=N
             enhanced_description = f"{product_code} - UPC: {found_upc} - {description}"
         else:
             enhanced_description = f"{product_code} - {description}"
-    
+
     # Clean and validate description
     cleaned_description = clean_description_artifacts(enhanced_description)
-    
+
     return cleaned_description
 
 # Step 2: Context-aware description cleaning
 def clean_description_artifacts(description):
     """Remove processing artifacts and improve description quality"""
-    
+
     # Remove common artifacts
     cleaned = description
-    
+
     # Remove duplicate product codes
     cleaned = re.sub(r'\b([A-Z]{2}\d{4}[A-Z]?)\b.*\1\b', r'\1', cleaned)
-    
+
     # Clean up spacing and formatting
     cleaned = re.sub(r'\s+', ' ', cleaned)
     cleaned = cleaned.strip()
-    
+
     # Remove table headers that got included
     table_headers = ['Product Code', 'UPC', 'Description', 'Qty', 'Price']
     for header in table_headers:
         cleaned = cleaned.replace(header, '')
-    
+
     # Remove trailing commas and artifacts
     cleaned = re.sub(r'[,\s]+$', '', cleaned)
-    
+
     return cleaned
 
 # Step 3: Description completeness validation
 def validate_description_quality(description, product_code):
     """Validate description meets quality standards"""
-    
+
     quality_checks = {
         'has_product_code': product_code in description,
         'has_upc': 'UPC:' in description,
@@ -460,15 +460,15 @@ def validate_description_quality(description, product_code):
         'no_artifacts': not any(artifact in description for artifact in ['Traditional D-code format', '$$']),
         'no_duplicates': description.count(product_code) <= 2  # Allow one in UPC format
     }
-    
+
     passed_checks = sum(quality_checks.values())
     quality_score = passed_checks / len(quality_checks)
-    
+
     if quality_score < 0.8:
         print(f"⚠️ Low quality description for {product_code}: {quality_score:.1%}")
         print(f"   Description: {description}")
         return False
-    
+
     return True
 ```
 

@@ -194,13 +194,13 @@ class TestPageBoundaryProcessingHappyPath:
         Page 1:
         XS9826A 6"H Metal Ballerina Ornament
         Quantity: 12
-        
-        Page 2: 
+
+        Page 2:
         XS8911A 4-3/4"L x 3-1/2"W Product
         Quantity: 24
-        
+
         Page 3:
-        XS9482 8.25"H Wood Shoe Ornament  
+        XS9482 8.25"H Wood Shoe Ornament
         Quantity: 8
         """
 

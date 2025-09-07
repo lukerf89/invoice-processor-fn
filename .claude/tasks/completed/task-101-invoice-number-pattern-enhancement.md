@@ -38,11 +38,11 @@ def test_order_no_pattern_fails_with_current_extraction():
         Mock(type_="invoice_id", mention_text=""),  # Empty - should fail
         Mock(type_="invoice_date", mention_text="09/05/2025")
     ]
-    
+
     # Current pattern from main.py line 2852-2856
     current_pattern = r"Invoice\s*#?\s*:\s*([A-Z0-9]+)"
     match = re.search(current_pattern, mock_document.text, re.IGNORECASE)
-    
+
     # RED: This should fail with current pattern
     assert match is None, f"Current pattern should not match ORDER NO format, but found: {match}"
 
@@ -50,25 +50,25 @@ def test_extract_cs003837319_returns_empty_currently():
     """Test that CS003837319 invoice number extraction currently fails - RED test"""
     # Load actual CS003837319_Error Document AI output
     import json
-    
+
     with open('test_invoices/CS003837319_Error_docai_output.json', 'r') as f:
         doc_data = json.load(f)
-    
+
     # Create mock document from actual data
     mock_document = Mock()
     mock_document.text = doc_data.get('text', '')
     mock_document.entities = []
-    
+
     # Add entities without invoice_id to simulate current failure
     for entity_data in doc_data.get('entities', []):
         entity = Mock()
         entity.type_ = entity_data.get('type', '')
         entity.mention_text = entity_data.get('mentionText', '')
         mock_document.entities.append(entity)
-    
+
     # Process with current implementation
     results = process_creative_coop_document(mock_document)
-    
+
     # RED: Should demonstrate current invoice number extraction failure
     # Check if any row contains empty invoice number
     has_empty_invoice = any(not row[1] for row in results if len(row) > 1)
@@ -79,10 +79,10 @@ def test_invoice_hash_pattern_still_works():
     mock_document = Mock()
     mock_document.text = "Invoice #: ABC123456"
     mock_document.entities = [Mock(type_="invoice_id", mention_text="")]
-    
+
     current_pattern = r"Invoice\s*#?\s*:\s*([A-Z0-9]+)"
     match = re.search(current_pattern, mock_document.text, re.IGNORECASE)
-    
+
     assert match is not None
     assert match.group(1) == "ABC123456"
 
@@ -91,9 +91,9 @@ def test_empty_document_handling():
     mock_document = Mock()
     mock_document.text = ""
     mock_document.entities = []
-    
+
     results = process_creative_coop_document(mock_document)
-    
+
     # Should handle gracefully without crashing
     assert isinstance(results, list)
 ```
@@ -110,7 +110,7 @@ def extract_creative_coop_invoice_number(document_text, entities):
     invoice_number = entities.get("invoice_id", "")
     if invoice_number:
         return invoice_number
-    
+
     # Creative-Coop specific patterns in order of preference
     patterns = [
         r"ORDER\s+NO\s*:\s*([A-Z0-9]+)",          # Primary: "ORDER NO: CS003837319"
@@ -118,14 +118,14 @@ def extract_creative_coop_invoice_number(document_text, entities):
         r"Order\s+Number\s*:\s*([A-Z0-9]+)",      # Alternative format
         r"Invoice\s*#?\s*:\s*([A-Z0-9]+)",        # Fallback: existing pattern
     ]
-    
+
     for pattern in patterns:
         match = re.search(pattern, document_text, re.IGNORECASE)
         if match:
             invoice_number = match.group(1)
             print(f"✅ Invoice number extracted using pattern '{pattern}': {invoice_number}")
             return invoice_number
-    
+
     print("❌ No invoice number pattern matched")
     return ""
 
@@ -154,7 +154,7 @@ def extract_creative_coop_invoice_number_enhanced(document_text, entities):
     if invoice_number:
         print(f"✅ Invoice number from entities: {invoice_number}")
         return invoice_number
-    
+
     # Try each pattern with detailed logging
     for pattern_name, pattern in CREATIVE_COOP_INVOICE_PATTERNS:
         match = re.search(pattern, document_text, re.IGNORECASE)
@@ -164,7 +164,7 @@ def extract_creative_coop_invoice_number_enhanced(document_text, entities):
             return invoice_number
         else:
             print(f"⚠️ Pattern {pattern_name} did not match")
-    
+
     print("❌ No invoice number pattern matched - check document format")
     return ""
 ```
@@ -185,7 +185,7 @@ def extract_creative_coop_invoice_number_enhanced(document_text, entities):
 ## Engineering Principles Applied
 
 **Principle 1 - Testability**: Every pattern change verified with specific test cases using actual CS003837319 data
-**Principle 2 - Maintainability**: Centralized pattern constants for easy future invoice format additions  
+**Principle 2 - Maintainability**: Centralized pattern constants for easy future invoice format additions
 **Principle 3 - Performance**: Optimized regex patterns with early termination on first match
 **Principle 4 - Reliability**: Comprehensive error handling for edge cases and malformed data
 **Principle 5 - Backward Compatibility**: Preserves existing Invoice # functionality while adding ORDER NO support
@@ -256,7 +256,7 @@ def extract_creative_coop_invoice_number_enhanced(document_text, entities):
 - Verified existing Invoice # pattern functionality
 - Added edge case testing for malformed input handling
 
-### GREEN Phase ✅ COMPLETED  
+### GREEN Phase ✅ COMPLETED
 - Enhanced `main.py` with `extract_creative_coop_invoice_number()` function
 - Added multi-line regex support: `r"ORDER\s+NO\s*:\s*.*?\s+([A-Z]{2}\d{9})"`
 - Successfully extracts CS003837319 from structured Creative-Coop layout
@@ -278,7 +278,7 @@ def extract_creative_coop_invoice_number_enhanced(document_text, entities):
 ### Implementation Summary
 
 **Files Modified**:
-- `/Volumes/Working/Code/GoogleCloud/invoice-processor-fn/main.py` 
+- `/Volumes/Working/Code/GoogleCloud/invoice-processor-fn/main.py`
   - Lines 2834-2841: Added `CREATIVE_COOP_INVOICE_PATTERNS` constants
   - Lines 2844-2869: New `extract_creative_coop_invoice_number()` function
   - Line 2887: Updated `process_creative_coop_document()` to use new function
@@ -286,10 +286,10 @@ def extract_creative_coop_invoice_number_enhanced(document_text, entities):
 **Files Created**:
 - `test_scripts/test_creative_coop_invoice_number_extraction.py` (comprehensive test suite)
 
-**Key Technical Achievement**: 
+**Key Technical Achievement**:
 Successfully handled Creative-Coop's structured layout where "ORDER NO:" appears on one line but the actual invoice number (CS003837319) appears several lines later. The multi-line regex pattern `r"ORDER\s+NO\s*:\s*.*?\s+([A-Z]{2}\d{9})"` with `re.DOTALL` flag correctly captures this format.
 
-**Business Impact**: 
+**Business Impact**:
 - Fixed 0% → 100% invoice number extraction for Creative-Coop ORDER NO format
 - Maintains 100% accuracy for existing Invoice # format
 - No processing time impact or regression issues
