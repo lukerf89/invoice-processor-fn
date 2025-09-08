@@ -47,18 +47,58 @@ ENV/
 .DS_Store
 ._*
 Thumbs.db
+*.orig
 
 # Google Cloud
 .gcloudignore
 service-account-key.json
 
-# Test files
+# Test output files and temporary data
 test_invoices/
+test_outputs/
+test_results/
 *.pdf
 *_docai_output.json
+*_processed_output.csv
+*_production_output*.csv
+*_test_output.csv
+*_baseline.json
+*_metrics.json
+*_history.json
 
-# Development/debug files - Include test_scripts in repo for development workflow
-# test_scripts/ - REMOVED from .gitignore to include in repo
+# Test scripts output and temporary files
+test_scripts/*.csv
+test_scripts/*.json
+test_scripts/*.txt
+test_scripts/*.log
+test_scripts/*.tmp
+test_scripts/baselines/
+test_scripts/outputs/
+test_scripts/temp/
+test_scripts/__pycache__/
+
+# Keep core test scripts but ignore outputs
+!test_scripts/*.py
+
+# Development/debug temporary files
 test-invoice-processor-workspace/
+debug_output/
+temp_processing/
+*.tmp
+*.bak
+*.cache
+
+# Jupyter notebooks and checkpoints
+*.ipynb
+.ipynb_checkpoints/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
 
 # Pre-commit hooks test comment for verification
